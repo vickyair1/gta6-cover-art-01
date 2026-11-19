@@ -1,7 +1,7 @@
 // Neon Coast Cover Studio — editor wiring.
 // Owns the state, the controls, undo/redo, drag-to-pan, uploads, the live
 // preview canvas and the PNG exports. ?shot= scenes live in shots.js.
-import { drawCoverArt, LAYOUTS, GRADES, FONTS, BADGES, defaultPanels } from './cover.js';
+import { drawCoverArt, LAYOUTS, GRADES, FONTS, BADGES, PANEL_CAPTIONS, DEFAULT_TAGLINE2, DEFAULT_QUOTE, defaultPanels } from './cover.js';
 import { runShot } from './shots.js';
 
 export const SIZES = [
@@ -12,12 +12,15 @@ export const SIZES = [
 
 export function freshState() {
   return {
-    layout: 'grid', grade: 'vice', font: 'anton', tagFont: 'script',
+    layout: 'poster', grade: 'vice', font: 'anton', tagFont: 'script',
     title: 'NEON COAST', tagline: 'Sunset heist on Palm Row',
-    badge: 'NEON COAST', placement: 'bottom',
+    tagline2: DEFAULT_TAGLINE2, quote: DEFAULT_QUOTE,
+    badge: 'EST. 2026', stars: 5, showStars: true, showCaptions: true,
+    panelCaptions: [...PANEL_CAPTIONS],
+    placement: 'bottom',
     titleColor: '#ffffff', tagColor: '#ffd166', outlineColor: '#0d0d12',
     titleSize: 100, outline: true, shadow: true,
-    size: 'wide', panels: defaultPanels('grid', 2), selected: 0,
+    size: 'wide', panels: defaultPanels('poster', 4), selected: 0,
     showGrade: true,
   };
 }
@@ -92,11 +95,11 @@ export function loadImage(url) {
 async function addFiles(files) {
   const list = [...files].filter((f) => f.type.startsWith('image/'));
   if (!list.length) { setStatus('That was not an image file.'); return; }
-  for (const f of list.slice(0, 3 - photos.length)) {
+  for (const f of list.slice(0, 4 - photos.length)) {
     const img = await loadImage(URL.createObjectURL(f));
     photos.push({ img, name: f.name });
   }
-  if (photos.length > 3) photos = photos.slice(0, 3);
+  if (photos.length > 4) photos = photos.slice(0, 4);
   state.panels = state.panels.map((p) => ({ ...p, photo: Math.min(p.photo, photos.length - 1) }));
   buildPhotoPickers();
   redraw();
@@ -108,7 +111,7 @@ async function loadSample(name) {
   const img = await loadImage(`samples/${name}.jpg`);
   const i = photos.findIndex((p) => p.name === `sample:${name}`);
   if (i >= 0) photos[i] = { img, name: `sample:${name}` };
-  else if (photos.length < 3) photos.push({ img, name: `sample:${name}` });
+  else if (photos.length < 4) photos.push({ img, name: `sample:${name}` });
   else photos[photos.length - 1] = { img, name: `sample:${name}` };
   state.panels = defaultPanels(state.layout, photos.length, photos, currentSize());
   buildPhotoPickers();
@@ -226,11 +229,15 @@ function syncPanelControls() {
   $('zoomVal').textContent = `${Math.round(p.zoom * 100)}%`;
   $('panXVal').textContent = p.ox.toFixed(2);
   $('panYVal').textContent = p.oy.toFixed(2);
+  $('panelCaption').value = (state.panelCaptions && state.panelCaptions[state.selected]) || '';
 }
 
 function syncControls() {
   $('title').value = state.title;
   $('tagline').value = state.tagline;
+  $('tagline2').value = state.tagline2 || DEFAULT_TAGLINE2;
+  $('quote').value = state.quote || DEFAULT_QUOTE;
+  $('badgeText').value = state.badge;
   $('titleSize').value = state.titleSize;
   $('titleSizeVal').textContent = `${state.titleSize}%`;
   $('titleColor').value = state.titleColor;
@@ -242,6 +249,8 @@ function syncControls() {
   $('outline').checked = state.outline;
   $('shadow').checked = state.shadow;
   $('showGrade').checked = state.showGrade;
+  $('showStars').checked = state.showStars !== false;
+  $('showCaptions').checked = state.showCaptions !== false;
   buildLayoutButtons();
   buildGradeButtons();
   buildSizeButtons();
@@ -253,6 +262,20 @@ function syncControls() {
 function bindControls() {
   $('title').addEventListener('input', (e) => { state.title = e.target.value; redraw(); });
   $('tagline').addEventListener('input', (e) => { state.tagline = e.target.value; redraw(); });
+  $('tagline2').addEventListener('input', (e) => { state.tagline2 = e.target.value; redraw(); });
+  $('quote').addEventListener('input', (e) => { state.quote = e.target.value; redraw(); });
+  $('badgeText').addEventListener('input', (e) => {
+    state.badge = e.target.value;
+    buildBadgeButtons();
+    redraw();
+  });
+  $('panelCaption').addEventListener('input', (e) => {
+    if (!state.panelCaptions) state.panelCaptions = [...PANEL_CAPTIONS];
+    state.panelCaptions[state.selected] = e.target.value;
+    redraw();
+  });
+  $('showStars').addEventListener('change', (e) => { pushHistory(); state.showStars = e.target.checked; redraw(); });
+  $('showCaptions').addEventListener('change', (e) => { pushHistory(); state.showCaptions = e.target.checked; redraw(); });
   $('titleSize').addEventListener('input', (e) => {
     state.titleSize = Number(e.target.value);
     $('titleSizeVal').textContent = `${state.titleSize}%`;
@@ -289,7 +312,7 @@ function bindControls() {
     const keepPhotos = photos;
     state = freshState();
     photos = keepPhotos;
-    state.panels = defaultPanels('grid', Math.max(photos.length, 1), photos, currentSize());
+    state.panels = defaultPanels('poster', Math.max(photos.length, 1), photos, currentSize());
     syncControls(); redraw();
     setStatus('Reset to a fresh cover.');
   });
@@ -308,6 +331,8 @@ function bindControls() {
   $('compare').addEventListener('pointerleave', () => { if (!state.showGrade) { state.showGrade = true; $('showGrade').checked = true; redraw(); } });
   $('sampleBoulevard').addEventListener('click', () => loadSample('boulevard'));
   $('samplePier').addEventListener('click', () => loadSample('pier'));
+  $('sampleRooftop').addEventListener('click', () => loadSample('rooftop'));
+  $('sampleNeon').addEventListener('click', () => loadSample('neon'));
   $('photo').addEventListener('change', (e) => addFiles(e.target.files));
   $('exportOne').addEventListener('click', () => exportCover(currentSize()));
   $('exportAll').addEventListener('click', async () => {
@@ -360,7 +385,7 @@ function bindControls() {
     else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
     else if (e.key.toLowerCase() === 's') { e.preventDefault(); $('surprise').click(); }
     else if (e.key.toLowerCase() === 'e') { e.preventDefault(); exportCover(currentSize()); }
-    else if (e.key >= '1' && e.key <= '5') {
+    else if (e.key >= '1' && e.key <= '6') {
       const l = LAYOUTS[Number(e.key) - 1];
       if (l) { pushHistory(); state.layout = l.id; state.panels = defaultPanels(l.id, Math.max(photos.length, 1), photos, currentSize()); syncControls(); redraw(); }
     } else if (e.key.toLowerCase() === 'g') {
