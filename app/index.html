@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Coast Cover Studio — multi-panel poster cover maker</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">NC</span><span class="brand-name">Neon Coast <em>Cover Studio</em></span></div>
+  <p class="brand-sub">Turn your photo into multi-panel poster cover art — no upload, everything stays on your machine.</p>
+  <div class="top-actions">
+    <button id="undo" type="button" title="Undo (Ctrl+Z)">↩ Undo</button>
+    <button id="redo" type="button" title="Redo (Ctrl+Y)">↪ Redo</button>
+    <button id="surprise" type="button" class="accent" title="Shuffle layout + grade (S)">✦ Surprise me</button>
+    <button id="reset" type="button" title="Start over">Reset</button>
+  </div>
+</header>
+<main class="app">
+  <section class="controls" aria-label="Cover controls">
+    <div class="group">
+      <h2>1 · Photos</h2>
+      <label class="file-label">Upload up to 3 photos
+        <input id="photo" type="file" accept="image/*" multiple>
+      </label>
+      <p class="hint">Or drag &amp; drop images onto the preview. Click a panel in the preview to select it, then drag inside it to reposition the photo.</p>
+      <div class="row">
+        <button id="sampleBoulevard" type="button">Use sample: Boulevard</button>
+        <button id="samplePier" type="button">Use sample: Pier</button>
+      </div>
+      <div id="photoPickers" class="chips" aria-label="Photos, tap one to put it in the selected panel"></div>
+    </div>
+
+    <div class="group">
+      <h2>2 · Layout</h2>
+      <div id="layouts" class="seg-row" role="group" aria-label="Layout"></div>
+      <p class="hint">Keys 1–5 switch layouts. <span id="panelCount"></span></p>
+    </div>
+
+    <div class="group">
+      <h2>3 · Selected panel</h2>
+      <p id="panelLabel" class="panel-label">Panel 1</p>
+      <label>Zoom <span id="zoomVal">100%</span>
+        <input id="zoom" type="range" min="1" max="2.5" step="0.05" value="1">
+      </label>
+      <label>Move left / right <span id="panXVal">0.00</span>
+        <input id="panX" type="range" min="-1" max="1" step="0.05" value="0">
+      </label>
+      <label>Move up / down <span id="panYVal">0.00</span>
+        <input id="panY" type="range" min="-1" max="1" step="0.05" value="0">
+      </label>
+    </div>
+
+    <div class="group">
+      <h2>4 · Colour grade</h2>
+      <div id="grades" class="swatches" role="group" aria-label="Colour grade"></div>
+      <label class="check"><input id="showGrade" type="checkbox" checked> Apply grade (uncheck to compare)</label>
+      <button id="compare" type="button" class="ghost">Hold to see before / after</button>
+    </div>
+
+    <div class="group">
+      <h2>5 · Caption</h2>
+      <label>Title <input id="title" type="text" maxlength="28" value="NEON COAST"></label>
+      <label>Tagline <input id="tagline" type="text" maxlength="48" value="Sunset heist on Palm Row"></label>
+      <div class="row2">
+        <label>Title font
+          <select id="font">
+            <option value="anton">Anton Heavy</option>
+            <option value="bebas">Bebas Tall</option>
+            <option value="pacifico">Pacifico Script</option>
+          </select>
+        </label>
+        <label>Tagline style
+          <select id="tagFont">
+            <option value="script">Pacifico script</option>
+            <option value="bebas">Bebas caps</option>
+          </select>
+        </label>
+      </div>
+      <label>Title size <span id="titleSizeVal">100%</span>
+        <input id="titleSize" type="range" min="60" max="140" step="5" value="100">
+      </label>
+      <label>Title placement
+        <select id="placement">
+          <option value="bottom">Bottom title block</option>
+          <option value="top">Top title block</option>
+          <option value="none">No title block (over photo)</option>
+        </select>
+      </label>
+      <div class="row3">
+        <label>Title colour <input id="titleColor" type="color" value="#ffffff"></label>
+        <label>Tagline colour <input id="tagColor" type="color" value="#ffd166"></label>
+        <label>Outline colour <input id="outlineColor" type="color" value="#0d0d12"></label>
+      </div>
+      <label class="check"><input id="outline" type="checkbox" checked> Bold outline</label>
+      <label class="check"><input id="shadow" type="checkbox" checked> Drop shadow</label>
+      <h3 class="sub">Badge ribbon</h3>
+      <div id="badges" class="seg-row" role="group" aria-label="Badge ribbon"></div>
+    </div>
+
+    <div class="group">
+      <h2>6 · Export</h2>
+      <div id="sizes" class="seg-row" role="group" aria-label="Export size"></div>
+      <div class="row">
+        <button id="exportOne" type="button" class="primary">Export PNG (E)</button>
+        <button id="exportAll" type="button">Export all 3 sizes</button>
+      </div>
+      <p class="hint">PNG at 1080×1080, 1080×1350 or 1920×1080. Shortcuts: Ctrl+Z undo · Ctrl+Y redo · S surprise · E export · G next grade · 1–5 layout.</p>
+      <p id="status" role="status"></p>
+    </div>
+  </section>
+
+  <section class="stage" aria-label="Live preview">
+    <div id="dropzone" class="dropzone">
+      <canvas id="cover" width="1080" height="608" aria-label="The cover preview"></canvas>
+      <p class="drop-hint">Drop photos here · click a panel to select it · drag inside a panel to move its photo</p>
+    </div>
+  </section>
+</main>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
