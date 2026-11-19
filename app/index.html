@@ -22,7 +22,7 @@
   <section class="controls" aria-label="Cover controls">
     <div class="group">
       <h2>1 · Photos</h2>
-      <label class="file-label">Upload up to 3 photos
+      <label class="file-label">Upload up to 4 photos
         <input id="photo" type="file" accept="image/*" multiple>
       </label>
       <p class="hint">Or drag &amp; drop images onto the preview. Click a panel in the preview to select it, then drag inside it to reposition the photo.</p>
@@ -30,13 +30,17 @@
         <button id="sampleBoulevard" type="button">Use sample: Boulevard</button>
         <button id="samplePier" type="button">Use sample: Pier</button>
       </div>
+      <div class="row">
+        <button id="sampleRooftop" type="button">Use sample: Rooftop</button>
+        <button id="sampleNeon" type="button">Use sample: Neon Street</button>
+      </div>
       <div id="photoPickers" class="chips" aria-label="Photos, tap one to put it in the selected panel"></div>
     </div>
 
     <div class="group">
       <h2>2 · Layout</h2>
       <div id="layouts" class="seg-row" role="group" aria-label="Layout"></div>
-      <p class="hint">Keys 1–5 switch layouts. <span id="panelCount"></span></p>
+      <p class="hint">Keys 1–6 switch layouts. <span id="panelCount"></span></p>
     </div>
 
     <div class="group">
@@ -51,6 +55,9 @@
       <label>Move up / down <span id="panYVal">0.00</span>
         <input id="panY" type="range" min="-1" max="1" step="0.05" value="0">
       </label>
+      <label>Panel caption <span class="field-note">Place — time · flavour, shown as a chip on this panel</span>
+        <input id="panelCaption" type="text" maxlength="64" value="OCEAN DRIVE — 6:42 PM · LOOKING FOR TROUBLE">
+      </label>
     </div>
 
     <div class="group">
@@ -64,6 +71,8 @@
       <h2>5 · Caption</h2>
       <label>Title <input id="title" type="text" maxlength="28" value="NEON COAST"></label>
       <label>Tagline <input id="tagline" type="text" maxlength="48" value="Sunset heist on Palm Row"></label>
+      <label>Bottom strip <input id="tagline2" type="text" maxlength="48" value="ONE COAST • NO RULES • COMING SOON"></label>
+      <label>Press quote <input id="quote" type="text" maxlength="64" value="&quot;A FEVER DREAM IN NEON&quot; — THE COAST HERALD"></label>
       <div class="row2">
         <label>Title font
           <select id="font">
@@ -97,7 +106,10 @@
       <label class="check"><input id="outline" type="checkbox" checked> Bold outline</label>
       <label class="check"><input id="shadow" type="checkbox" checked> Drop shadow</label>
       <h3 class="sub">Badge ribbon</h3>
+      <label>Starburst badge text <input id="badgeText" type="text" maxlength="20" value="EST. 2026"></label>
       <div id="badges" class="seg-row" role="group" aria-label="Badge ribbon"></div>
+      <label class="check"><input id="showStars" type="checkbox" checked> WANTED ★★★★★ heat chip</label>
+      <label class="check"><input id="showCaptions" type="checkbox" checked> Per-panel place captions</label>
     </div>
 
     <div class="group">
@@ -107,7 +119,7 @@
         <button id="exportOne" type="button" class="primary">Export PNG (E)</button>
         <button id="exportAll" type="button">Export all 3 sizes</button>
       </div>
-      <p class="hint">PNG at 1080×1080, 1080×1350 or 1920×1080. Shortcuts: Ctrl+Z undo · Ctrl+Y redo · S surprise · E export · G next grade · 1–5 layout.</p>
+      <p class="hint">PNG at 1080×1080, 1080×1350 or 1920×1080. Shortcuts: Ctrl+Z undo · Ctrl+Y redo · S surprise · E export · G next grade · 1–6 layout.</p>
       <p id="status" role="status"></p>
     </div>
   </section>
