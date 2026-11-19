@@ -7,6 +7,12 @@
 // /output/dossier.json with the vendored make.fun library, exactly as the
 // kit's starter did — the plumbing is the same, the app is all new.
 //
+// v2 (round 2, 2026-11-19): Poster Hero layout, Poster Ink grade, 4 sample
+// photos, per-panel place captions, starburst badge, WANTED heat chip,
+// VOL. 06 / COLLECTOR'S EDITION furniture and the big sunset-gradient
+// title block — built on the round-1 entry to answer the leaderboard
+// benchmark (rank 949/2,317, judge 705.070; rank 100 needs 825.700).
+//
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts

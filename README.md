@@ -8,19 +8,21 @@ Serve it with `node serve.ts` and open http://localhost:8080. Everything runs of
 
 ## What it does
 
-- **5 layouts** — 9-Panel Grid, Hero + Three, Full Bleed, Tilted Collage, Story Strip — with a live preview.
-- **Up to 3 photos** — file upload or drag & drop; click any panel to select it, drag inside it to reposition, sliders for zoom and pan, per-panel photo picker.
-- **6 colour grades** — Vice Sunset, Neon Night, Palm Gold, Teal Noir, Mono Pop, Candy Pop — gradient-map / duotone tint + contrast and saturation on canvas, plus halftone dots, grain, vignette, inked panel borders and neon glow.
-- **Caption editing** — title + tagline, Anton / Bebas Neue / Pacifico fonts, size, top / bottom / no title-block placement, outline + drop shadow, colour pickers, and a badge ribbon with invented place words only (Neon Coast, Leonida Bay…).
+- **6 layouts** — 9-Panel Grid, Poster Hero (big hero + 2×2, the default), Hero + Three, Full Bleed, Tilted Collage, Story Strip — with a live preview.
+- **Up to 4 photos** — file upload or drag & drop; click any panel to select it, drag inside it to reposition, sliders for zoom and pan, per-panel photo picker. Four free sample photos ship with the app (Boulevard, Pier, Rooftop, Neon Street) and the defaults use all four, never repeating a photo next to itself.
+- **7 colour grades** — Vice Sunset, Neon Night, Palm Gold, Teal Noir, Mono Pop, Candy Pop, Poster Ink (heavy posterize + halftone duotone) — gradient-map / duotone tint + contrast and saturation on canvas, plus halftone dots, grain, vignette, thin cream panel frames with a dark inner line (GTA poster style) and neon glow.
+- **Caption editing** — title + tagline, Anton / Bebas Neue / Pacifico fonts, size, top / bottom / no title-block placement, outline + drop shadow, colour pickers. The title block is a real poster block: huge sunset-gradient title (white → gold → orange → magenta) with a thick dark outline and magenta offset shadow, a neon Pacifico script tagline overlapping it, a 5-star heat-meter row with an invented press quote, a spaced-caps bottom strip ("ONE COAST • NO RULES • COMING SOON") and footer credits, all over a halftone-dot band.
+- **Per-panel captions** — every panel gets a place + time + flavour chip ("MARINA DEL SOL — 7:40 PM · NO WITNESSES"); edit the selected panel's caption in the editor, or toggle all captions off.
+- **Poster furniture** — a spiky gold starburst badge ("EST. 2026", editable text or presets), a "WANTED ★★★★★" heat chip, and a "VOL. 06" chip plus "COLLECTOR'S EDITION" ribbon in the title band.
 - **Export** — one-click PNG at 1080×1080, 1080×1350 or 1920×1080, plus “Export all 3 sizes”.
-- **Polish** — undo/redo, reset, “Surprise me” shuffle, hold-to-compare before/after grade, keyboard shortcuts (Ctrl+Z / Ctrl+Y, S, E, G, 1–5), one-click sample photos so the first cover is one click away.
+- **Polish** — undo/redo, reset, “Surprise me” shuffle, hold-to-compare before/after grade, keyboard shortcuts (Ctrl+Z / Ctrl+Y, S, E, G, 1–6), one-click sample photos so the first cover is one click away.
 
 ## Screenshots
 
-- `1-cover.jpg` — exported wide cover (1920×1080)
-- `2-editor.jpg` — the editor with a photo loaded
-- `3-cover-story.jpg` — exported story cover (1080×1350)
-- `4-cover-square.jpg` — exported square cover (1080×1080)
+- `1-cover.jpg` — exported wide cover, Poster Hero layout, Vice Sunset (1920×1080)
+- `2-editor.jpg` — the editor with all four photos loaded
+- `3-cover-story.jpg` — exported story cover, 9-Panel Grid, Poster Ink (1080×1350)
+- `4-cover-square.jpg` — exported square cover, Tilted Collage, Neon Night (1080×1080)
 
 ## License
 
