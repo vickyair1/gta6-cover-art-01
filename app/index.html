@@ -26,6 +26,9 @@
         <input id="photo" type="file" accept="image/*" multiple>
       </label>
       <p class="hint">Or drag &amp; drop images onto the preview. Click a panel in the preview to select it, then drag inside it to reposition the photo.</p>
+      <h3 class="sub">Cast</h3>
+      <p class="hint">Give each photo a character role — people panels get a black role tag on the cover and the billing block lists the cast. Scene photos keep the place chip.</p>
+      <div id="castRows" style="display:flex;flex-direction:column;gap:6px" aria-label="Cast: one role per photo"></div>
       <div class="row">
         <button id="sampleBoulevard" type="button">Use sample: Boulevard</button>
         <button id="samplePier" type="button">Use sample: Pier</button>
@@ -62,7 +65,7 @@
       <label>Move up / down <span id="panYVal">0.00</span>
         <input id="panY" type="range" min="-1" max="1" step="0.05" value="0">
       </label>
-      <label>Panel caption <span class="field-note">Place — time · flavour, shown as a chip on this panel</span>
+      <label>Panel caption <span class="field-note">Place — time · flavour. Shown as a chip on scene panels; people panels use the Cast role tag</span>
         <input id="panelCaption" type="text" maxlength="64" value="OCEAN DRIVE — 6:42 PM · LOOKING FOR TROUBLE">
       </label>
     </div>
@@ -117,7 +120,7 @@
       <label>Starburst badge text <input id="badgeText" type="text" maxlength="20" value="EST. 2026"></label>
       <div id="badges" class="seg-row" role="group" aria-label="Badge ribbon"></div>
       <label class="check"><input id="showStars" type="checkbox" checked> WANTED ★★★★★ heat chip</label>
-      <label class="check"><input id="showCaptions" type="checkbox" checked> Per-panel place captions</label>
+      <label class="check"><input id="showCaptions" type="checkbox" checked> Character callouts + place captions</label>
     </div>
 
     <div class="group">
