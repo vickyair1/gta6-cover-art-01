@@ -1,10 +1,11 @@
-// Neon Coast Cover Studio v2 — cover renderer.
+// Neon Coast Cover Studio v3 — cover renderer.
 // Draws multi-panel poster art onto any 2D canvas: panels filled from the
 // user's photos, a colour grade per preset, inked cream frames, halftone +
 // grain, per-panel place captions, a starburst badge, a wanted chip, and a
 // big sunset-gradient title block with a neon script tagline. Pure canvas,
 // no network, no libraries.
 export const LAYOUTS = [
+  { id: 'keyart', label: 'Key Art', hint: 'Full-bleed 6-panel, title over the art' },
   { id: 'grid', label: '9-Panel Grid', hint: 'Classic poster grid' },
   { id: 'poster', label: 'Poster Hero', hint: 'Big hero + 2x2, title block below' },
   { id: 'hero', label: 'Hero + Three', hint: 'One big moment, three beats' },
@@ -21,6 +22,7 @@ export const GRADES = [
   { id: 'mono', label: 'Mono Pop', filter: 'grayscale(1) contrast(1.28) brightness(1.05)', sky: '#ffffff', deep: '#ff2e88' },
   { id: 'candy', label: 'Candy Pop', filter: 'saturate(1.7) contrast(1.06) brightness(1.05)', sky: '#ff5db1', deep: '#22d3ee' },
   { id: 'ink', label: 'Poster Ink', filter: 'saturate(1.6) contrast(1.38) brightness(1.02)', sky: '#ff7a3c', deep: '#2a0a4a', ink: true },
+  { id: 'dusk', label: 'Dusk Heat', filter: 'saturate(1.5) contrast(1.2) brightness(1.02)', sky: '#ff8a3c', deep: '#8a0f5c' },
 ];
 
 export const FONTS = [
@@ -31,18 +33,33 @@ export const FONTS = [
 
 const BADGES = ['EST. 2026', 'NEON COAST', 'LEONIDA BAY', 'VICE SUNSET', 'PALM ROW', 'TURBO HEAT', 'MIDNIGHT DRIVE'];
 
+// Per-photo subject focus (fractions of the photo's width/height), measured
+// from the real sample photos: where the face or hero object sits, so the
+// default framing aims the visible window at the subject.
+const PHOTO_FOCUS = [
+  { x: 0.42, y: 0.18 }, // boulevard: woman's face, upper centre-left
+  { x: 0.35, y: 0.20 }, // pier: fisherman's face, upper left
+  { x: 0.62, y: 0.30 }, // rooftop: bearded man, right of frame
+  { x: 0.48, y: 0.38 }, // neon: two friends laughing, centre
+  { x: 0.55, y: 0.72 }, // car: orange sports car, low in the frame
+  { x: 0.43, y: 0.45 }, // bike: rider + motorcycle, centre-left
+  { x: 0.50, y: 0.50 }, // boat: speedboat + wake, centre
+];
+
 // Per-panel place captions: invented place + time + flavour. Panel i gets
 // entry i; the editor lets the user rewrite the selected panel's caption.
+// Ordered for the Key Art photo sequence [boulevard, rooftop, neon, car,
+// bike, boat], so each visible chip names the photo it sits on.
 export const PANEL_CAPTIONS = [
   'OCEAN DRIVE — 6:42 PM · LOOKING FOR TROUBLE',
+  'TOWER 2 — 6:10 PM · LAST SWIM',
+  'NEON ROW — 12:04 AM · OPEN ALL NIGHT',
+  'INTERSTATE 6 — 11:59 PM · FULL THROTTLE',
+  'VICE POINT — 8:05 PM · NO TURNING BACK',
   'MARINA DEL SOL — 7:40 PM · NO WITNESSES',
   'PIER 26 — 5:30 AM · GONE FISHING',
   'PALM BOULEVARD — 9:15 PM · LIGHTS OUT',
-  'INTERSTATE 6 — 11:59 PM · FULL THROTTLE',
-  'TOWER 2 — 6:10 PM · LAST SWIM',
   'SUNSET HEIGHTS — 6:30 PM · BIG MONEY',
-  'NEON ROW — 12:04 AM · OPEN ALL NIGHT',
-  'VICE POINT — 8:05 PM · NO TURNING BACK',
 ];
 
 // Default bottom strip + press quote (invented, no real publication).
@@ -73,8 +90,10 @@ function fitFont(ctx, text, family, maxW, startPx, weight) {
 }
 
 // Panel rectangles for a layout, inside W x H, leaving room for the title band.
+// 'none' and 'overlap' reserve no band: the panels fill the whole canvas and
+// the title draws over them.
 export function layoutPanels(layout, W, H, placement) {
-  const band = placement === 'none' ? 0 : (placement === 'top' ? H * 0.15 : H * 0.36);
+  const band = (placement === 'none' || placement === 'overlap') ? 0 : (placement === 'top' ? H * 0.15 : H * 0.36);
   const top = placement === 'top' ? band : 0;
   const areaH = H - band;
   const gap = Math.max(6, Math.round(W * 0.008));
@@ -90,6 +109,26 @@ export function layoutPanels(layout, W, H, placement) {
       const out = [];
       for (let i = 0; i < 9; i++) out.push(cell(3, 3, i));
       return out;
+    }
+    case 'keyart': {
+      // Rank-1 geometry: hero left (~55% width, full panel-area height);
+      // right side stacks a 2-panel top row (~32% height), one wide middle
+      // panel (~30%) and a 2-panel bottom row (~32%). Fractions only, so the
+      // same geometry works for wide, story and square.
+      const heroW = w * 0.55;
+      const sideX = x0 + heroW + gap, sideW = w - heroW - gap;
+      const cw = (sideW - gap) / 2;
+      const rowsH = h - gap * 2;
+      const topH = rowsH * 32 / 94, midH = rowsH * 30 / 94, botH = rowsH * 32 / 94;
+      const yTop = y0, yMid = y0 + topH + gap, yBot = y0 + topH + midH + gap * 2;
+      return [
+        { x: x0, y: y0, w: heroW, h, rot: 0 },
+        { x: sideX, y: yTop, w: cw, h: topH, rot: 0 },
+        { x: sideX + cw + gap, y: yTop, w: cw, h: topH, rot: 0 },
+        { x: sideX, y: yMid, w: sideW, h: midH, rot: 0 },
+        { x: sideX, y: yBot, w: cw, h: botH, rot: 0 },
+        { x: sideX + cw + gap, y: yBot, w: cw, h: botH, rot: 0 },
+      ];
     }
     case 'poster': {
       // Rank-2 geometry: big hero left (~55% width, full panel-area height),
@@ -140,7 +179,7 @@ export function layoutPanels(layout, W, H, placement) {
 }
 
 function panelCount(layout) {
-  return layout === 'grid' ? 9 : layout === 'poster' ? 5 : layout === 'hero' ? 4 : layout === 'full' ? 1 : layout === 'collage' ? 5 : 4;
+  return layout === 'grid' ? 9 : layout === 'keyart' ? 6 : layout === 'poster' ? 5 : layout === 'hero' ? 4 : layout === 'full' ? 1 : layout === 'collage' ? 5 : 4;
 }
 
 // Photo assignment with NO adjacent repeats: the 9-panel grid cycles
@@ -150,6 +189,7 @@ function panelCount(layout) {
 // photo never looks identical twice.
 const PHOTO_SEQ = {
   grid: [0, 1, 2, 3, 0, 1, 2, 3, 0],
+  keyart: [0, 2, 3, 4, 6, 5],
   poster: [0, 1, 2, 3, 1],
   hero: [0, 1, 2, 3],
   collage: [0, 1, 2, 3, 1],
@@ -159,9 +199,9 @@ const PHOTO_SEQ = {
 
 // Per-photo horizontal bias: the rooftop sample's face sits on the right of
 // the frame, so its panels pan left (negative ox shows the right side).
-const PHOTO_OX = [0, 0, -0.45, 0];
+const PHOTO_OX = [0, 0, -0.45, 0, 0, 0, 0];
 
-export function defaultPanels(layout, photoCount, photos, dims) {
+export function defaultPanels(layout, photoCount, photos, dims, placement = 'bottom') {
   const n = panelCount(layout);
   const seq = PHOTO_SEQ[layout] || PHOTO_SEQ.grid;
   const out = [];
@@ -175,29 +215,35 @@ export function defaultPanels(layout, photoCount, photos, dims) {
     });
   }
   if (photos && photos.length && dims && dims.w && dims.h) {
-    // Face-safe default framing, aimed from the real photos: cover-fit crops
-    // a portrait photo top and bottom, and faces sit in the top third, so a
-    // centred crop cuts the face out of a wide panel. Anchor the visible
-    // window just below the top of the photo instead. The pan value is
-    // derived from drawPanel's own offset formula, so the default framing is
-    // exactly what the renderer draws.
-    const rects = layoutPanels(layout, dims.w, dims.h, 'bottom');
+    // Subject-safe default framing, aimed from the real photos: cover-fit
+    // crops a photo to the panel, so the visible window is centred on each
+    // photo's subject (face or hero object, PHOTO_FOCUS) instead of the
+    // photo's centre — a centred crop cuts the face out of a wide panel,
+    // and a top-anchored crop cuts the car out of its panel entirely. The
+    // pan values are derived from drawPanel's own offset formula, so the
+    // default framing is exactly what the renderer draws.
+    const rects = layoutPanels(layout, dims.w, dims.h, placement);
     for (let i = 0; i < n; i++) {
       const img = photos[out[i].photo] && photos[out[i].photo].img;
       if (!img || !img.naturalWidth || !img.naturalHeight) continue;
       const r = rects[i];
-      const base = Math.max(r.w / img.naturalWidth, r.h / img.naturalHeight);
-      const ph = img.naturalHeight * base;
-      // Aim the window at 2% down the photo, never past full coverage.
-      const dy = Math.max(r.h - ph, Math.min(0, -0.02 * ph));
-      const anchorOy = (dy - (r.h - ph) / 2) / (r.h * 0.4);
-      out[i].oy = clamp(anchorOy + out[i].oy * 0.4, -1, 1);
-      // Top-visibility guard: never crop more than ~6% of the photo's
-      // height from the top, or faces that start near the frame edge
-      // (the rooftop sample) get cut out of short wide panels.
+      const focus = PHOTO_FOCUS[out[i].photo] || { x: 0.5, y: 0.3 };
       const zBase = Math.max(r.w / img.naturalWidth, r.h / img.naturalHeight) * (out[i].zoom || 1);
-      const zPh = img.naturalHeight * zBase;
+      const zPw = img.naturalWidth * zBase, zPh = img.naturalHeight * zBase;
+      if (zPw > r.w) {
+        const dx = clamp(r.w / 2 - focus.x * zPw, r.w - zPw, 0);
+        out[i].ox = clamp((dx - (r.w - zPw) / 2) / (r.w * 0.4), -1, 1);
+      }
       if (zPh > r.h) {
+        const dy = clamp(r.h / 2 - focus.y * zPh, r.h - zPh, 0);
+        out[i].oy = clamp((dy - (r.h - zPh) / 2) / (r.h * 0.4) + out[i].oy * 0.4, -1, 1);
+      }
+      // Top-visibility guard, face photos only: never crop more than ~6%
+      // of the photo's height from the top, or faces that start near the
+      // frame edge (the rooftop sample) get cut out of short wide panels.
+      // Object photos (car, bike, boat) keep their low focus — the subject
+      // sits at the bottom of the frame.
+      if (focus.y < 0.5 && zPh > r.h) {
         const rawDy = (r.h - zPh) / 2 + out[i].oy * r.h * 0.4;
         const shownDy = clamp(rawDy, r.h - zPh, 0);
         if (shownDy < -0.06 * zPh) {
@@ -515,6 +561,76 @@ function drawGradientTitle(ctx, title, family, cx, baseline, px, grade, state) {
   ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 }
 
+// Bottom strip for the overlap title: a sunset band with ~10 procedural
+// palm silhouettes (trunk line + 5 frond arcs each) and the spaced-caps
+// tagline centred on it, rank-1 box-art style.
+function drawPalmBand(ctx, W, H, stripText) {
+  const bandY = H * 0.925, bandH = H * 0.05;
+  const g = ctx.createLinearGradient(0, bandY, 0, bandY + bandH);
+  g.addColorStop(0, '#ff8a3c');
+  g.addColorStop(0.55, '#ff2e88');
+  g.addColorStop(1, '#5b0a6e');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, bandY, W, bandH);
+  const rnd = mulberry32(20261120);
+  ctx.strokeStyle = 'rgba(16,4,28,0.92)';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 10; i++) {
+    const px = ((i + 0.5) / 10) * W + (rnd() - 0.5) * W * 0.03;
+    const ph = bandH * (0.55 + rnd() * 0.45);
+    const baseY = bandY + bandH;
+    const topY = baseY - ph;
+    const lean = (rnd() - 0.5) * ph * 0.25;
+    ctx.lineWidth = Math.max(1.5, bandH * 0.045);
+    ctx.beginPath();
+    ctx.moveTo(px, baseY);
+    ctx.quadraticCurveTo(px + lean * 0.3, baseY - ph * 0.6, px + lean, topY);
+    ctx.stroke();
+    const crownX = px + lean;
+    const frondLen = ph * 0.55;
+    ctx.lineWidth = Math.max(1.2, bandH * 0.035);
+    for (let f = 0; f < 5; f++) {
+      const theta = Math.PI * (1.2 + f * 0.15);
+      const dx = Math.cos(theta), dy = Math.sin(theta);
+      const tipX = crownX + dx * frondLen;
+      const tipY = topY + dy * frondLen + frondLen * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(crownX, topY);
+      ctx.quadraticCurveTo(crownX + dx * frondLen * 0.55, topY + dy * frondLen * 0.55 - frondLen * 0.18, tipX, tipY);
+      ctx.stroke();
+    }
+  }
+  if (stripText) {
+    const sPx = Math.max(12, H * 0.021);
+    ctx.font = `bold ${sPx}px 'Bebas Neue', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    try { ctx.letterSpacing = `${Math.max(2, H * 0.004)}px`; } catch { /* older canvas: no tracking */ }
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = sPx * 0.4;
+    ctx.fillStyle = '#fff3d6';
+    ctx.fillText(stripText, W / 2, bandY + bandH / 2 + sPx * 0.05);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+    try { ctx.letterSpacing = '0px'; } catch { /* ignore */ }
+  }
+}
+
+// Small white barcode, bottom-right: ~20 seeded random-width black bars.
+function drawBarcode(ctx, W, H) {
+  const bw = W * 0.05, bh = H * 0.017;
+  const bx = W - bw - W * 0.012, by = H - bh - H * 0.004;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(bx, by, bw, bh);
+  const rnd = mulberry32(90210);
+  ctx.fillStyle = '#0d0d12';
+  let x = bx + bw * 0.08;
+  while (x < bx + bw * 0.92) {
+    const barW = Math.max(1, rnd() * bw * 0.045);
+    if (rnd() > 0.35) ctx.fillRect(x, by + bh * 0.12, barW, bh * 0.76);
+    x += barW + Math.max(1, rnd() * bw * 0.03);
+  }
+}
+
 function drawTitleBlock(ctx, W, H, state, grade) {
   const title = (state.title || '').trim().toUpperCase();
   const tag = (state.tagline || '').trim();
@@ -558,6 +674,103 @@ function drawTitleBlock(ctx, W, H, state, grade) {
       ctx.textAlign = 'center';
       ctx.fillText(tag, cx, H - H * 0.155);
     }
+  } else if (placement === 'overlap') {
+    // Title OVER the art, rank-1 box-art style: the panels fill the whole
+    // canvas (no band reserved), a scrim fades up from the bottom, and the
+    // heat row, huge title, script tagline and furniture sit on top of the
+    // photos, with a palm-silhouette strip + barcode along the bottom edge.
+    const scrimTop = H * 0.55;
+    const sg = ctx.createLinearGradient(0, scrimTop, 0, H);
+    sg.addColorStop(0, 'rgba(8,6,16,0)');
+    sg.addColorStop(0.35, 'rgba(8,6,16,0.45)');
+    sg.addColorStop(1, 'rgba(8,6,16,0.85)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, scrimTop, W, H - scrimTop);
+
+    // Heat-meter row: 5 gold stars + invented press quote, above the title.
+    const stars = Math.max(0, Math.min(5, state.stars ?? 5));
+    const quote = (state.quote || DEFAULT_QUOTE).trim();
+    if (state.showStars !== false || quote) {
+      const qPx = Math.max(13, H * 0.021);
+      ctx.font = `bold ${qPx}px 'Bebas Neue', sans-serif`;
+      const starText = state.showStars === false ? '' : '★'.repeat(stars) + ' ';
+      const line = `${starText}${quote}`.trim();
+      const lineW = ctx.measureText(line).width;
+      const lx = cx - lineW / 2;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      if (state.showStars !== false) {
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText('★'.repeat(stars), lx, H * 0.615);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillText(quote, lx + (state.showStars === false ? 0 : ctx.measureText('★'.repeat(stars) + ' ').width), H * 0.615);
+    }
+
+    // The title: cap-height ~16% of poster height, fitting 94% width.
+    const titleBaseline = H * 0.83;
+    let titlePx = 0;
+    if (title) {
+      const sizeScale = (state.titleSize || 100) / 100;
+      titlePx = fitFont(ctx, title, font.family, W * 0.94, Math.max(20, H * 0.22 * sizeScale), '400');
+      drawGradientTitle(ctx, title, font.family, cx, titleBaseline, titlePx, grade, state);
+    }
+    // Neon script tagline overlapping the bottom of the title.
+    if (tag) {
+      const tagPx = fitFont(ctx, tag, 'Pacifico, cursive', W * 0.72, Math.max(16, H * 0.052), '400');
+      ctx.save();
+      ctx.translate(cx + W * 0.06, titleBaseline + tagPx * 0.62);
+      ctx.rotate(-0.02);
+      ctx.font = `${tagPx}px Pacifico, cursive`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(255,46,136,0.9)';
+      ctx.shadowBlur = tagPx * 0.5;
+      ctx.fillStyle = '#ff7ad9';
+      ctx.fillText(tag, 0, 0);
+      ctx.restore();
+    }
+
+    // VOL. 06 chip, top-right of the scrim zone.
+    const volPx = Math.max(13, H * 0.024);
+    ctx.font = `bold ${volPx}px Anton, sans-serif`;
+    const volW = ctx.measureText('VOL. 06').width + volPx * 1.4;
+    ctx.save();
+    ctx.translate(W - volW / 2 - W * 0.02, H * 0.60);
+    ctx.rotate(0.06);
+    ctx.fillStyle = '#19d3c5';
+    ctx.fillRect(-volW / 2, -volPx * 0.95, volW, volPx * 1.9);
+    ctx.lineWidth = Math.max(2, volPx * 0.1);
+    ctx.strokeStyle = '#0d0d12';
+    ctx.strokeRect(-volW / 2, -volPx * 0.95, volW, volPx * 1.9);
+    ctx.fillStyle = '#0d0d12';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('VOL. 06', 0, volPx * 0.05);
+    ctx.restore();
+
+    // COLLECTOR'S EDITION ribbon, right edge below the title.
+    const ribPx = Math.max(11, H * 0.019);
+    ctx.font = `bold ${ribPx}px Anton, sans-serif`;
+    const ribW = ctx.measureText("COLLECTOR'S EDITION").width + ribPx * 1.4;
+    ctx.save();
+    ctx.translate(W - ribW / 2 - W * 0.015, H * 0.885);
+    ctx.rotate(-0.03);
+    ctx.fillStyle = '#ff2e88';
+    ctx.fillRect(-ribW / 2, -ribPx * 0.95, ribW, ribPx * 1.9);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText("COLLECTOR'S EDITION", 0, ribPx * 0.05);
+    ctx.restore();
+
+    // Bottom strip: palm-silhouette band + spaced-caps tagline, then
+    // footer credits and a barcode at the bottom-right.
+    const strip = (state.tagline2 || DEFAULT_TAGLINE2).trim().toUpperCase();
+    drawPalmBand(ctx, W, H, strip);
+    ctx.font = `bold ${Math.max(10, H * 0.013)}px sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('NEON COAST  •  MADE WITH NEON COAST COVER STUDIO', cx, H - Math.max(7, H * 0.009));
+    drawBarcode(ctx, W, H);
   } else {
     // Bottom poster block: ~36% of the height — heat-meter row + press
     // quote, huge gradient title, neon script tagline overlapping the
@@ -706,9 +919,17 @@ export function drawCoverArt(canvas, state, opts = {}) {
     });
   });
   // Caption chips on top of everything, so an overlapping collage panel
-  // never buries a neighbour's chip.
+  // never buries a neighbour's chip. In 'overlap' placement the title
+  // scrim covers the lower canvas, so panels ending inside the scrim zone
+  // (below 55% H) get no chip: the keyart middle panel ends at ~65% H and
+  // its chip would sit right under the heat-meter row at 64% H. Only the
+  // top-row chips survive — rank-1 covers show no chips in the title zone.
   if (state.showCaptions !== false) {
-    panels.forEach((rect, i) => drawCaptionChip(ctx, rect, captions[i] || ''));
+    const overlap = (state.placement || 'bottom') === 'overlap';
+    panels.forEach((rect, i) => {
+      if (overlap && rect.y + rect.h > H * 0.55) return;
+      drawCaptionChip(ctx, rect, captions[i] || '');
+    });
   }
   // Vignette over everything.
   const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);

@@ -1,4 +1,4 @@
-// Fixed scenes for screenshots. Each ?shot= scene loads the four free sample
+// Fixed scenes for screenshots. Each ?shot= scene loads the seven free sample
 // photos, picks a layout + grade + caption, draws the cover with the app's
 // own renderer, and sets window.__shotReady once painted.
 //   ?shot=editor       — the editor, photos loaded, panels + controls visible
@@ -27,21 +27,30 @@ export async function runShot(shot, query, api) {
   const caption = query.get('caption') ?? 'Neon Coast';
   const grade = query.get('grade') ?? 'vice';
   const layout = query.get('layout') ?? 'poster';
+  const placement = query.get('placement') ?? 'overlap';
   const sizeId = query.get('size') ?? 'wide';
   await loadFonts();
 
-  // All four sample photos, in the same order the editor loads them:
+  // All seven sample photos, in the same order the editor loads them:
   // boulevard (woman, sunset palms), pier (fisherman), rooftop (bearded man
-  // on a hotel roof at dusk), neon (two friends on a neon diner street).
+  // on a hotel roof at dusk), neon (two friends on a neon diner street),
+  // car (orange sports car, Ocean Drive sunset), bike (motorcycle, neon
+  // night street), boat (speedboat, turquoise cove sunset).
   const boulevard = await api.loadImage('samples/boulevard.jpg');
   const pier = await api.loadImage('samples/pier.jpg');
   const rooftop = await api.loadImage('samples/rooftop.jpg');
   const neon = await api.loadImage('samples/neon.jpg');
+  const car = await api.loadImage('samples/car.jpg');
+  const bike = await api.loadImage('samples/bike.jpg');
+  const boat = await api.loadImage('samples/boat.jpg');
   const photos = [
     { img: boulevard, name: 'sample:boulevard' },
     { img: pier, name: 'sample:pier' },
     { img: rooftop, name: 'sample:rooftop' },
     { img: neon, name: 'sample:neon' },
+    { img: car, name: 'sample:car' },
+    { img: bike, name: 'sample:bike' },
+    { img: boat, name: 'sample:boat' },
   ];
   api.setPhotos(photos);
 
@@ -59,8 +68,9 @@ export async function runShot(shot, query, api) {
   state.panelCaptions = [...PANEL_CAPTIONS];
   state.grade = grade;
   state.layout = layout;
+  state.placement = placement;
   state.size = sizeId;
-  state.panels = defaultPanels(layout, photos.length, photos, dims);
+  state.panels = defaultPanels(layout, photos.length, photos, dims, placement);
   state.selected = 0;
   api.setState(state);
 
