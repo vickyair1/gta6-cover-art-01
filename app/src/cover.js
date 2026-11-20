@@ -1,7 +1,10 @@
-// Neon Coast Cover Studio v3 — cover renderer.
+// Neon Coast Cover Studio v5 — cover renderer.
 // Draws multi-panel poster art onto any 2D canvas: panels filled from the
 // user's photos, a colour grade per preset, inked cream frames, halftone +
-// grain, per-panel place captions, a starburst badge, a wanted chip, and a
+// grain, character callout tags on people panels (black angled tag, white
+// condensed caps + place/time/flavour subline), place chips on scene
+// panels, a full billing block along the bottom edge, a stars + press
+// quote strip at the very top, a starburst badge, a wanted chip, and a
 // big sunset-gradient title block with a neon script tagline. Pure canvas,
 // no network, no libraries.
 export const LAYOUTS = [
@@ -49,17 +52,43 @@ const PHOTO_FOCUS = [
 // Per-panel place captions: invented place + time + flavour. Panel i gets
 // entry i; the editor lets the user rewrite the selected panel's caption.
 // Ordered for the Key Art photo sequence [boulevard, rooftop, neon, car,
-// bike, boat], so each visible chip names the photo it sits on.
+// pier, bike], so each visible chip names the photo it sits on. Only scene
+// panels (car, boat) show these — people panels show their cast callout.
+// The boat entry sits at index 6 for the layouts that still show it.
 export const PANEL_CAPTIONS = [
   'OCEAN DRIVE — 6:42 PM · LOOKING FOR TROUBLE',
   'TOWER 2 — 6:10 PM · LAST SWIM',
   'NEON ROW — 12:04 AM · OPEN ALL NIGHT',
   'INTERSTATE 6 — 11:59 PM · FULL THROTTLE',
+  'PIER 26 — 5:30 AM · GONE FISHING',
   'VICE POINT — 8:05 PM · NO TURNING BACK',
   'MARINA DEL SOL — 7:40 PM · NO WITNESSES',
-  'PIER 26 — 5:30 AM · GONE FISHING',
   'PALM BOULEVARD — 9:15 PM · LIGHTS OUT',
   'SUNSET HEIGHTS — 6:30 PM · BIG MONEY',
+];
+
+// Character roles for the cast callouts — one role per photo, each used
+// role appears once per cover (the billing block dedupes).
+export const ROLE_POOL = [
+  'THE DRIVER', 'THE BOSS', 'THE INSIDER', 'THE FIXER', 'THE RIDER',
+  'THE LOOKOUT', 'THE MECHANIC', 'THE COURIER', 'THE CLOSER',
+  'THE NAVIGATOR', 'THE CAPTAIN', 'THE WHEELMAN',
+];
+
+// Default cast, indexed by photo slot (0 boulevard, 1 pier, 2 rooftop,
+// 3 neon, 4 car, 5 bike, 6 boat). role '' marks a scene panel: it keeps
+// the place/time chip instead of a callout, and stays out of the billing
+// block. The hero's subline is place + time only, kept short so her tag
+// stays clear of the title; the other people panels get place + time +
+// flavour. The bike counts as a people panel — the rider is visible.
+export const DEFAULT_CAST = [
+  { role: 'THE DRIVER', line: 'OCEAN DRIVE · 6:42 PM · TROUBLE' },
+  { role: 'THE CAPTAIN', line: 'PIER 26 · 5:30 AM · GONE FISHING' },
+  { role: 'THE BOSS', line: 'ROOFTOP BAR · 8:05 PM · RUNS THIS TOWN' },
+  { role: 'THE INSIDER', line: 'NEON ROW · 12:04 AM · OPEN ALL NIGHT' },
+  { role: '', line: 'INTERSTATE 6 · 11:59 PM · FULL THROTTLE' },
+  { role: 'THE RIDER', line: 'NEON ROW · 2:15 AM · NEVER BRAKES' },
+  { role: '', line: 'MARINA DEL SOL · 7:40 PM · NO WITNESSES' },
 ];
 
 // Default bottom strip + press quote (invented, no real publication).
@@ -187,9 +216,12 @@ function panelCount(layout) {
 // Poster/hero/collage/strip use all four photos once, plus one extra that
 // never sits next to its twin. Zoom and pan vary per panel so a repeated
 // photo never looks identical twice.
+// Key Art is people-first: five of the six panels show a person (hero
+// boulevard, rooftop, neon, pier, bike rider) and only one is a vehicle
+// (the orange Corvette, mid-wide). The boat cove sits out of Key Art.
 const PHOTO_SEQ = {
   grid: [0, 1, 2, 3, 0, 1, 2, 3, 0],
-  keyart: [0, 2, 3, 4, 6, 5],
+  keyart: [0, 2, 3, 4, 1, 5],
   poster: [0, 1, 2, 3, 1],
   hero: [0, 1, 2, 3],
   collage: [0, 1, 2, 3, 1],
@@ -419,10 +451,12 @@ function drawPanel(ctx, rect, img, panel, grade, opts) {
   return { x, y, w, h, rot };
 }
 
-// Per-panel caption chip, bottom-left: place name + time/flavour. Drawn in
-// a second pass over the panels (see drawCoverArt) so an overlapping
-// collage panel never buries a neighbour's chip.
-function drawCaptionChip(ctx, rect, caption) {
+// Per-panel caption chip, bottom-left: place name + time/flavour. Scene
+// panels only (car, boat) — people panels get the cast callout instead.
+// The chip's bottom edge is clamped to 91% of the canvas height, above
+// the palm strip and the billing block; panels ending higher keep their
+// natural bottom-margin position.
+function drawCaptionChip(ctx, rect, caption, W, H, placement) {
   if (!caption) return;
   const { x, y, w, h, rot } = rect;
   const parts = String(caption).split(' — ');
@@ -441,7 +475,10 @@ function drawCaptionChip(ctx, rect, caption) {
   const padX = namePx * 0.55, padY = namePx * 0.32;
   const chipW = Math.max(nameW, subW) + padX * 2;
   const chipH = namePx + (rest ? subPx + namePx * 0.22 : 0) + padY * 2;
-  const cx0 = Math.max(4, w * 0.03), cy0 = h - chipH - Math.max(4, h * 0.04);
+  const cx0 = Math.max(4, w * 0.03);
+  const naturalBottom = h - Math.max(4, h * 0.04);
+  const maxBottom = H * 0.91 - y;
+  const cy0 = Math.max(0, Math.min(naturalBottom - chipH, maxBottom - chipH));
   ctx.fillStyle = 'rgba(8,6,16,0.88)';
   ctx.fillRect(cx0, cy0, chipW, chipH);
   ctx.fillStyle = '#ffd166';
@@ -455,6 +492,80 @@ function drawCaptionChip(ctx, rect, caption) {
     ctx.fillStyle = '#ffd166';
     ctx.font = `bold ${subPx}px sans-serif`;
     ctx.fillText(rest, cx0 + padX, cy0 + padY + namePx + subPx * 0.9);
+  }
+  ctx.restore();
+}
+
+// Character callout tag, bottom-left of a people panel, rank-1 box-art
+// style: black angled tag with a magenta edge stripe, white condensed caps
+// for the role and a short gold place/time/flavour subline. The subline is
+// dropped on small panels low on the poster (the title/tagline zone in
+// title-over-art) and whenever the tag would outgrow its panel; the tag's
+// bottom edge is clamped to 91% of the canvas height, above the palm strip
+// and the billing block.
+function drawCallout(ctx, rect, cast, W, H, placement) {
+  const { x, y, w, h, rot } = rect;
+  const role = String(cast.role || '').trim().toUpperCase();
+  const line = String(cast.line || '').trim().toUpperCase();
+  if (!role) return;
+  const namePx = clamp(w * 0.052, 10, 30);
+  const subPx = Math.max(8, namePx * 0.58);
+  const padX = namePx * 0.55, padY = namePx * 0.32;
+  const slant = namePx * 0.4;
+  const marginX = Math.max(4, w * 0.03);
+  // Small panels low on the poster sit in the title/tagline zone: role
+  // only, no subline — the subline would run under the title.
+  const smallLow = w < W * 0.30 && y + h > H * 0.86;
+  let showLine = !!line && !smallLow;
+  ctx.save();
+  if (rot) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-w / 2, -h / 2); }
+  else ctx.translate(x, y);
+  const measure = (withLine) => {
+    ctx.font = `bold ${namePx}px Anton, sans-serif`;
+    const nameW = ctx.measureText(role).width;
+    let subW = 0;
+    if (withLine) {
+      ctx.font = `bold ${subPx}px sans-serif`;
+      subW = ctx.measureText(line).width;
+    }
+    const chipW = Math.max(nameW, subW) + padX * 2 + slant;
+    const chipH = namePx + (withLine ? subPx + namePx * 0.22 : 0) + padY * 2;
+    return { chipW, chipH };
+  };
+  let m = measure(showLine);
+  if (showLine && m.chipW > w - marginX * 2) { showLine = false; m = measure(false); }
+  const chipW = m.chipW, chipH = m.chipH;
+  const cx0 = marginX;
+  const naturalBottom = h - Math.max(4, h * 0.04);
+  const maxBottom = H * 0.91 - y;
+  const cy0 = Math.max(0, Math.min(naturalBottom - chipH, maxBottom - chipH));
+  // Angled black tag (italic lean) + magenta edge stripe on the left.
+  const edge = Math.max(3, namePx * 0.14);
+  ctx.fillStyle = 'rgba(8,6,16,0.92)';
+  ctx.beginPath();
+  ctx.moveTo(cx0 + slant, cy0);
+  ctx.lineTo(cx0 + chipW, cy0);
+  ctx.lineTo(cx0 + chipW - slant, cy0 + chipH);
+  ctx.lineTo(cx0, cy0 + chipH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ff2e88';
+  ctx.beginPath();
+  ctx.moveTo(cx0 + slant, cy0);
+  ctx.lineTo(cx0 + slant + edge, cy0);
+  ctx.lineTo(cx0 + edge, cy0 + chipH);
+  ctx.lineTo(cx0, cy0 + chipH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${namePx}px Anton, sans-serif`;
+  ctx.fillText(role, cx0 + slant + padX, cy0 + padY + namePx * 0.82);
+  if (showLine) {
+    ctx.fillStyle = '#ffd166';
+    ctx.font = `bold ${subPx}px sans-serif`;
+    ctx.fillText(line, cx0 + slant + padX, cy0 + padY + namePx + subPx * 0.9);
   }
   ctx.restore();
 }
@@ -563,9 +674,11 @@ function drawGradientTitle(ctx, title, family, cx, baseline, px, grade, state) {
 
 // Bottom strip for the overlap title: a sunset band with ~10 procedural
 // palm silhouettes (trunk line + 5 frond arcs each) and the spaced-caps
-// tagline centred on it, rank-1 box-art style.
+// tagline centred on it, rank-1 box-art style. The band sits at 91.5–
+// 95.5% of the height, leaving the bottom strip free for the billing
+// block; callout tags clamp above 91% so they never touch the band.
 function drawPalmBand(ctx, W, H, stripText) {
-  const bandY = H * 0.925, bandH = H * 0.05;
+  const bandY = H * 0.915, bandH = H * 0.04;
   const g = ctx.createLinearGradient(0, bandY, 0, bandY + bandH);
   g.addColorStop(0, '#ff8a3c');
   g.addColorStop(0.55, '#ff2e88');
@@ -631,6 +744,72 @@ function drawBarcode(ctx, W, H) {
   }
 }
 
+// Full billing block, rank-1 box-art style: two lines of small white caps
+// centred at the very bottom — the production line names every character
+// on the cover in panel order, each role once, then the camera/grade line.
+// A short dark gradient behind it keeps the small type legible over any
+// photo; the barcode sits to its right, clear of both lines.
+function drawBillingBlock(ctx, W, H, state) {
+  const cast = state.cast || DEFAULT_CAST;
+  const roles = [];
+  const seen = new Set();
+  (state.panels || []).forEach((p) => {
+    const c = cast[p.photo] || {};
+    const role = String(c.role || '').trim().toUpperCase();
+    if (role && !seen.has(role)) { seen.add(role); roles.push(role); }
+  });
+  const line1 = roles.length
+    ? `A NEON COAST PICTURE · STARRING ${roles.join(' · ')}`
+    : 'A NEON COAST PICTURE';
+  const line2 = 'SHOT ON YOUR OWN CAMERA · GRADED BY HAND';
+  const sg = ctx.createLinearGradient(0, H * 0.94, 0, H);
+  sg.addColorStop(0, 'rgba(8,6,16,0)');
+  sg.addColorStop(1, 'rgba(8,6,16,0.85)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, H * 0.94, W, H * 0.06);
+  const px = Math.min(
+    fitFont(ctx, line1, 'sans-serif', W * 0.86, Math.max(11, H * 0.014), 'bold'),
+    fitFont(ctx, line2, 'sans-serif', W * 0.86, Math.max(11, H * 0.014), 'bold'),
+  );
+  ctx.font = `bold ${px}px sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(line1, W / 2, H * 0.968);
+  ctx.fillText(line2, W / 2, H * 0.983);
+}
+
+// Stars + press quote strip at the very top of the poster, rank-1 style:
+// a dark gradient fading down from the top edge, gold stars and the
+// invented press quote centred on it. Drawn before the badge and the
+// WANTED chip, so those stay bright on top of it. Skipped for the top
+// title block, where the title itself lives at the top.
+function drawTopQuoteStrip(ctx, W, H, state) {
+  const stars = Math.max(0, Math.min(5, state.stars ?? 5));
+  const quote = (state.quote || DEFAULT_QUOTE).trim();
+  if (state.showStars === false && !quote) return;
+  const sg = ctx.createLinearGradient(0, 0, 0, H * 0.085);
+  sg.addColorStop(0, 'rgba(8,6,16,0.88)');
+  sg.addColorStop(1, 'rgba(8,6,16,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, 0, W, H * 0.085);
+  const starText = state.showStars === false ? '' : '★'.repeat(stars) + ' ';
+  const line = `${starText}${quote}`.trim();
+  if (!line) return;
+  const qPx = fitFont(ctx, line, "'Bebas Neue', sans-serif", W * 0.62, Math.max(13, H * 0.021), 'bold');
+  ctx.font = `bold ${qPx}px 'Bebas Neue', sans-serif`;
+  const lineW = ctx.measureText(line).width;
+  const lx = W / 2 - lineW / 2;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  if (state.showStars !== false) {
+    ctx.fillStyle = '#ffd166';
+    ctx.fillText('★'.repeat(stars), lx, H * 0.048);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillText(quote, lx + (state.showStars === false ? 0 : ctx.measureText('★'.repeat(stars) + ' ').width), H * 0.048);
+}
+
 function drawTitleBlock(ctx, W, H, state, grade) {
   const title = (state.title || '').trim().toUpperCase();
   const tag = (state.tagline || '').trim();
@@ -639,7 +818,9 @@ function drawTitleBlock(ctx, W, H, state, grade) {
   const cx = W / 2;
 
   if (placement === 'top') {
-    // Compact top block: gradient title + script tagline, no heat row.
+    // Compact top block: gradient title + script tagline, no heat row
+    // (the stars + press quote live in the top strip — which this
+    // placement skips, since the title itself is at the top).
     const bandH = H * 0.15;
     const g = ctx.createLinearGradient(0, 0, 0, bandH);
     g.addColorStop(0, 'rgba(8,6,16,0.92)'); g.addColorStop(1, 'rgba(8,6,16,0)');
@@ -658,6 +839,7 @@ function drawTitleBlock(ctx, W, H, state, grade) {
       ctx.textAlign = 'center';
       ctx.fillText(tag, cx, H * 0.145);
     }
+    drawBillingBlock(ctx, W, H, state);
   } else if (placement === 'none') {
     // Title over the photo: dark scrim, same big gradient lettering.
     const scrimH = H * 0.17;
@@ -674,11 +856,14 @@ function drawTitleBlock(ctx, W, H, state, grade) {
       ctx.textAlign = 'center';
       ctx.fillText(tag, cx, H - H * 0.155);
     }
+    drawBillingBlock(ctx, W, H, state);
   } else if (placement === 'overlap') {
     // Title OVER the art, rank-1 box-art style: the panels fill the whole
     // canvas (no band reserved), a scrim fades up from the bottom, and the
-    // heat row, huge title, script tagline and furniture sit on top of the
-    // photos, with a palm-silhouette strip + barcode along the bottom edge.
+    // huge title, script tagline and furniture sit on top of the photos,
+    // with a palm-silhouette strip, the billing block and a barcode along
+    // the bottom edge. The stars + press quote live in the top strip now
+    // (see drawTopQuoteStrip), not in a mid-poster heat row.
     const scrimTop = H * 0.55;
     const sg = ctx.createLinearGradient(0, scrimTop, 0, H);
     sg.addColorStop(0, 'rgba(8,6,16,0)');
@@ -686,26 +871,6 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     sg.addColorStop(1, 'rgba(8,6,16,0.85)');
     ctx.fillStyle = sg;
     ctx.fillRect(0, scrimTop, W, H - scrimTop);
-
-    // Heat-meter row: 5 gold stars + invented press quote, above the title.
-    const stars = Math.max(0, Math.min(5, state.stars ?? 5));
-    const quote = (state.quote || DEFAULT_QUOTE).trim();
-    if (state.showStars !== false || quote) {
-      const qPx = Math.max(13, H * 0.021);
-      ctx.font = `bold ${qPx}px 'Bebas Neue', sans-serif`;
-      const starText = state.showStars === false ? '' : '★'.repeat(stars) + ' ';
-      const line = `${starText}${quote}`.trim();
-      const lineW = ctx.measureText(line).width;
-      const lx = cx - lineW / 2;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
-      if (state.showStars !== false) {
-        ctx.fillStyle = '#ffd166';
-        ctx.fillText('★'.repeat(stars), lx, H * 0.615);
-      }
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.fillText(quote, lx + (state.showStars === false ? 0 : ctx.measureText('★'.repeat(stars) + ' ').width), H * 0.615);
-    }
 
     // The title: cap-height ~16% of poster height, fitting 94% width.
     const titleBaseline = H * 0.83;
@@ -747,12 +912,15 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     ctx.fillText('VOL. 06', 0, volPx * 0.05);
     ctx.restore();
 
-    // COLLECTOR'S EDITION ribbon, right edge below the title.
+    // COLLECTOR'S EDITION ribbon, stickered on the car panel's
+    // bottom-right corner: the bottom row now carries character callouts,
+    // so the ribbon moved up out of their way (it used to sit at 88.5% H,
+    // right where the bike panel's callout goes).
     const ribPx = Math.max(11, H * 0.019);
     ctx.font = `bold ${ribPx}px Anton, sans-serif`;
     const ribW = ctx.measureText("COLLECTOR'S EDITION").width + ribPx * 1.4;
     ctx.save();
-    ctx.translate(W - ribW / 2 - W * 0.015, H * 0.885);
+    ctx.translate(W - ribW / 2 - W * 0.015, H * 0.645);
     ctx.rotate(-0.03);
     ctx.fillStyle = '#ff2e88';
     ctx.fillRect(-ribW / 2, -ribPx * 0.95, ribW, ribPx * 1.9);
@@ -761,20 +929,17 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     ctx.fillText("COLLECTOR'S EDITION", 0, ribPx * 0.05);
     ctx.restore();
 
-    // Bottom strip: palm-silhouette band + spaced-caps tagline, then
-    // footer credits and a barcode at the bottom-right.
+    // Bottom strip: palm-silhouette band + spaced-caps tagline, then the
+    // full billing block and a barcode at the bottom-right.
     const strip = (state.tagline2 || DEFAULT_TAGLINE2).trim().toUpperCase();
     drawPalmBand(ctx, W, H, strip);
-    ctx.font = `bold ${Math.max(10, H * 0.013)}px sans-serif`;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText('NEON COAST  •  MADE WITH NEON COAST COVER STUDIO', cx, H - Math.max(7, H * 0.009));
+    drawBillingBlock(ctx, W, H, state);
     drawBarcode(ctx, W, H);
   } else {
-    // Bottom poster block: ~36% of the height — heat-meter row + press
-    // quote, huge gradient title, neon script tagline overlapping the
-    // title, VOL. 06 chip, COLLECTOR'S EDITION ribbon, tagline strip.
+    // Bottom poster block: ~36% of the height — huge gradient title, neon
+    // script tagline overlapping the title, VOL. 06 chip, COLLECTOR'S
+    // EDITION ribbon, tagline strip and the billing block. The stars +
+    // press quote live in the top strip now, not in a mid-poster heat row.
     const bandH = H * 0.36;
     const bandY = H - bandH;
     const g = ctx.createLinearGradient(0, bandY, 0, bandY + bandH);
@@ -799,26 +964,6 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     rule.addColorStop(0, '#ff7a3c'); rule.addColorStop(0.5, '#ffd166'); rule.addColorStop(1, '#ff2e88');
     ctx.fillStyle = rule;
     ctx.fillRect(0, bandY, W, Math.max(3, H * 0.005));
-
-    // Heat-meter row: 5 gold stars + invented press quote.
-    const stars = Math.max(0, Math.min(5, state.stars ?? 5));
-    const quote = (state.quote || DEFAULT_QUOTE).trim();
-    if (state.showStars !== false || quote) {
-      const qPx = Math.max(13, H * 0.021);
-      ctx.font = `bold ${qPx}px 'Bebas Neue', sans-serif`;
-      const starText = state.showStars === false ? '' : '★'.repeat(stars) + ' ';
-      const line = `${starText}${quote}`.trim();
-      const lineW = ctx.measureText(line).width;
-      const lx = cx - lineW / 2;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
-      if (state.showStars !== false) {
-        ctx.fillStyle = '#ffd166';
-        ctx.fillText('★'.repeat(stars), lx, bandY + H * 0.048);
-      }
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.fillText(quote, lx + (state.showStars === false ? 0 : ctx.measureText('★'.repeat(stars) + ' ').width), bandY + H * 0.048);
-    }
 
     // The title: cap-height ~13-15% of poster height, fitting 94% width.
     let titlePx = 0;
@@ -875,7 +1020,8 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     ctx.fillText("COLLECTOR'S EDITION", 0, ribPx * 0.05);
     ctx.restore();
 
-    // Bottom strip: spaced-caps tagline, then small footer credits.
+    // Bottom strip: spaced-caps tagline (lifted to make room for the
+    // billing block below it), then the billing block.
     const strip = (state.tagline2 || DEFAULT_TAGLINE2).trim().toUpperCase();
     if (strip) {
       const sPx = Math.max(12, H * 0.021);
@@ -884,13 +1030,10 @@ function drawTitleBlock(ctx, W, H, state, grade) {
       ctx.textBaseline = 'alphabetic';
       try { ctx.letterSpacing = `${Math.max(2, H * 0.004)}px`; } catch { /* older canvas: no tracking */ }
       ctx.fillStyle = '#ffd166';
-      ctx.fillText(strip, cx, H - H * 0.032);
+      ctx.fillText(strip, cx, H - H * 0.052);
       try { ctx.letterSpacing = '0px'; } catch { /* ignore */ }
     }
-    ctx.font = `bold ${Math.max(10, H * 0.013)}px sans-serif`;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.textAlign = 'center';
-    ctx.fillText('NEON COAST  •  MADE WITH NEON COAST COVER STUDIO', cx, H - Math.max(7, H * 0.009));
+    drawBillingBlock(ctx, W, H, state);
   }
 }
 
@@ -902,12 +1045,13 @@ export function drawCoverArt(canvas, state, opts = {}) {
   const W = canvas.width, H = canvas.height;
   const grade = GRADES.find((g) => g.id === state.grade) || GRADES[0];
   const o = { gradeOn: true, halftone: true, grain: true, tape: true, collagePad: true, ...opts };
+  const placement = state.placement || 'bottom';
   ctx.save();
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#0d0d12';
   ctx.fillRect(0, 0, W, H);
   const frame = state.layout === 'full' ? 'black' : 'cream';
-  const panels = layoutPanels(state.layout || 'poster', W, H, state.placement || 'bottom');
+  const panels = layoutPanels(state.layout || 'poster', W, H, placement);
   const captions = state.panelCaptions || PANEL_CAPTIONS;
   const rects = panels.map((rect, i) => {
     const p = (state.panels && state.panels[i]) || { photo: 0, zoom: 1, ox: 0, oy: 0 };
@@ -918,28 +1062,37 @@ export function drawCoverArt(canvas, state, opts = {}) {
       frame,
     });
   });
-  // Caption chips on top of everything, so an overlapping collage panel
-  // never buries a neighbour's chip. In 'overlap' placement the title
-  // scrim covers the lower canvas, so panels ending inside the scrim zone
-  // (below 55% H) get no chip: the keyart middle panel ends at ~65% H and
-  // its chip would sit right under the heat-meter row at 64% H. Only the
-  // top-row chips survive — rank-1 covers show no chips in the title zone.
-  if (state.showCaptions !== false) {
-    const overlap = (state.placement || 'bottom') === 'overlap';
+  // Callout tags + caption chips. People panels get the black role callout
+  // from the cast; scene panels (car, boat) keep the place/time chip.
+  // Every panel gets one: the old title-over-art suppression is gone — the
+  // press-quote heat row moved to the top strip, so nothing collides with
+  // the title any more, and the tags clamp above the palm strip. The tags
+  // draw AFTER the title block (except in 'none' placement, where the
+  // title sits over the photos and the tags must stay under it), so the
+  // title scrim never washes them out — a tag drawn before the scrim
+  // comes out grey, not white-on-black.
+  const drawChips = () => {
+    if (state.showCaptions === false) return;
+    const cast = state.cast || DEFAULT_CAST;
     panels.forEach((rect, i) => {
-      if (overlap && rect.y + rect.h > H * 0.55) return;
-      drawCaptionChip(ctx, rect, captions[i] || '');
+      const p = (state.panels && state.panels[i]) || { photo: 0 };
+      const c = cast[p.photo] || {};
+      if (c.role) drawCallout(ctx, rect, c, W, H, placement);
+      else drawCaptionChip(ctx, rect, captions[i] || '', W, H, placement);
     });
-  }
+  };
+  if (placement === 'none') drawChips();
   // Vignette over everything.
   const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
   vg.addColorStop(1, 'rgba(5,2,12,0.42)');
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H);
+  if (placement !== 'top') drawTopQuoteStrip(ctx, W, H, state);
   drawBadge(ctx, W, H, state.badge, grade);
   if (state.showStars !== false) drawWantedChip(ctx, W, H, state.stars ?? 5);
   drawTitleBlock(ctx, W, H, state, grade);
+  if (placement !== 'none') drawChips();
   ctx.restore();
   return rects;
 }

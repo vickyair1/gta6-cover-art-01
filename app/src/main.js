@@ -1,7 +1,7 @@
 // Neon Coast Cover Studio — editor wiring.
 // Owns the state, the controls, undo/redo, drag-to-pan, uploads, the live
 // preview canvas and the PNG exports. ?shot= scenes live in shots.js.
-import { drawCoverArt, LAYOUTS, GRADES, FONTS, BADGES, PANEL_CAPTIONS, DEFAULT_TAGLINE2, DEFAULT_QUOTE, defaultPanels } from './cover.js';
+import { drawCoverArt, LAYOUTS, GRADES, FONTS, BADGES, PANEL_CAPTIONS, ROLE_POOL, DEFAULT_CAST, DEFAULT_TAGLINE2, DEFAULT_QUOTE, defaultPanels } from './cover.js';
 import { runShot } from './shots.js';
 
 export const SIZES = [
@@ -17,6 +17,7 @@ export function freshState() {
     tagline2: DEFAULT_TAGLINE2, quote: DEFAULT_QUOTE,
     badge: 'EST. 2026', stars: 5, showStars: true, showCaptions: true,
     panelCaptions: [...PANEL_CAPTIONS],
+    cast: DEFAULT_CAST.map((c) => ({ ...c })),
     placement: 'overlap',
     titleColor: '#ffffff', tagColor: '#ffd166', outlineColor: '#0d0d12',
     titleSize: 100, outline: true, shadow: true,
@@ -102,6 +103,7 @@ async function addFiles(files) {
   if (photos.length > 7) photos = photos.slice(0, 7);
   state.panels = state.panels.map((p) => ({ ...p, photo: Math.min(p.photo, photos.length - 1) }));
   buildPhotoPickers();
+  buildCastEditor();
   redraw();
   setStatus(`Loaded ${photos.length} photo${photos.length === 1 ? '' : 's'} — drag on the cover to reposition a panel.`);
 }
@@ -115,6 +117,7 @@ async function loadSample(name) {
   else photos[photos.length - 1] = { img, name: `sample:${name}` };
   state.panels = defaultPanels(state.layout, photos.length, photos, currentSize(), state.placement);
   buildPhotoPickers();
+  buildCastEditor();
   redraw();
   setStatus(`Sample photo “${name}” loaded. Pick a layout and export.`);
 }
@@ -137,6 +140,73 @@ function buildPhotoPickers() {
     wrap.appendChild(chip);
   });
   if (!photos.length) wrap.innerHTML = '<span class="muted">No photos yet — load a sample below.</span>';
+}
+
+// Cast editor: one compact row per loaded photo — a role select from the
+// pool (or "— Scene —") plus the place/time/flavour line shown under the
+// role tag. Scene photos show a note instead of the line input; their
+// panels keep the place chip from the panel caption. Rebuilt whenever the
+// photos or the roles change; typing in a line input only redraws, so
+// focus is never lost mid-edit.
+function buildCastEditor() {
+  const wrap = $('castRows');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!state.cast) state.cast = DEFAULT_CAST.map((c) => ({ ...c }));
+  photos.forEach((p, i) => {
+    const entry = state.cast[i] || { role: '', line: '' };
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center';
+    const name = document.createElement('span');
+    name.textContent = `${i + 1} · ${p.name.replace('sample:', '')}`;
+    name.title = p.name.replace('sample:', '');
+    name.style.cssText = 'flex:0 0 74px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    row.appendChild(name);
+    const role = document.createElement('select');
+    role.setAttribute('aria-label', `Role for photo ${i + 1}`);
+    role.style.cssText = 'flex:1 1 104px;min-width:0;padding:6px 6px;font-size:12px';
+    const sceneOpt = document.createElement('option');
+    sceneOpt.value = '';
+    sceneOpt.textContent = '— Scene —';
+    role.appendChild(sceneOpt);
+    ROLE_POOL.forEach((r) => {
+      const o = document.createElement('option');
+      o.value = r;
+      o.textContent = r;
+      role.appendChild(o);
+    });
+    role.value = entry.role || '';
+    role.addEventListener('change', () => {
+      pushHistory();
+      state.cast[i] = { ...(state.cast[i] || { role: '', line: '' }), role: role.value };
+      buildCastEditor();
+      redraw();
+      setStatus(role.value ? `Photo ${i + 1} is now ${role.value}.` : `Photo ${i + 1} is a scene panel now.`);
+    });
+    row.appendChild(role);
+    if (entry.role) {
+      const line = document.createElement('input');
+      line.type = 'text';
+      line.maxLength = 48;
+      line.value = entry.line || '';
+      line.placeholder = 'Place · time · flavour';
+      line.setAttribute('aria-label', `Caption line for photo ${i + 1}`);
+      line.style.cssText = 'flex:1.5 1 90px;min-width:0;padding:6px 8px;font-size:12px';
+      line.addEventListener('input', () => {
+        state.cast[i] = { ...(state.cast[i] || { role: '', line: '' }), line: line.value };
+        redraw();
+      });
+      row.appendChild(line);
+    } else {
+      const note = document.createElement('span');
+      note.className = 'muted';
+      note.textContent = 'Scene — place chip from the panel caption.';
+      note.style.cssText = 'flex:1.5 1 90px;font-size:11px';
+      row.appendChild(note);
+    }
+    wrap.appendChild(row);
+  });
+  if (!photos.length) wrap.innerHTML = '<span class="muted">Load a photo to cast it.</span>';
 }
 
 function buildLayoutButtons() {
@@ -255,6 +325,7 @@ function syncControls() {
   buildGradeButtons();
   buildSizeButtons();
   buildBadgeButtons();
+  buildCastEditor();
   syncPanelControls();
   updateUndoButtons();
 }
@@ -428,7 +499,7 @@ export function getState() { return state; }
 export function getPhotos() { return photos; }
 export function setPhotos(next) { photos = next; }
 export function setState(next) { state = next; }
-export { redraw, syncControls, buildPhotoPickers, buildLayoutButtons, buildGradeButtons, buildSizeButtons, buildBadgeButtons };
+export { redraw, syncControls, buildPhotoPickers, buildCastEditor, buildLayoutButtons, buildGradeButtons, buildSizeButtons, buildBadgeButtons };
 
 const query = new URLSearchParams(location.search);
 const shot = query.get('shot');
