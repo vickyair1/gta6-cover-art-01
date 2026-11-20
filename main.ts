@@ -13,6 +13,14 @@
 // title block — built on the round-1 entry to answer the leaderboard
 // benchmark (rank 949/2,317, judge 705.070; rank 100 needs 825.700).
 //
+// v3 (round 4, 2026-11-20): Key Art layout (full-bleed 6-panel, title over
+// the art) + 'overlap' title placement + Dusk Heat grade + 3 new sample
+// photos (Sports Car, Night Bike, Speedboat) + palm-silhouette strip and
+// barcode furniture — built to answer the round-3 benchmark (rank 38/3,440,
+// judge 905.386; rank 1 is 939.361): the top entries all draw the title
+// overlapping full-bleed photo panels, where round 3 quarantined it in a
+// dead black band and repeated the fisherman photo.
+//
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
