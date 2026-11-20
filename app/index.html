@@ -22,7 +22,7 @@
   <section class="controls" aria-label="Cover controls">
     <div class="group">
       <h2>1 · Photos</h2>
-      <label class="file-label">Upload up to 4 photos
+      <label class="file-label">Upload up to 7 photos
         <input id="photo" type="file" accept="image/*" multiple>
       </label>
       <p class="hint">Or drag &amp; drop images onto the preview. Click a panel in the preview to select it, then drag inside it to reposition the photo.</p>
@@ -34,13 +34,20 @@
         <button id="sampleRooftop" type="button">Use sample: Rooftop</button>
         <button id="sampleNeon" type="button">Use sample: Neon Street</button>
       </div>
+      <div class="row">
+        <button id="sampleCar" type="button">Use sample: Sports Car</button>
+        <button id="sampleBike" type="button">Use sample: Night Bike</button>
+      </div>
+      <div class="row">
+        <button id="sampleBoat" type="button">Use sample: Speedboat</button>
+      </div>
       <div id="photoPickers" class="chips" aria-label="Photos, tap one to put it in the selected panel"></div>
     </div>
 
     <div class="group">
       <h2>2 · Layout</h2>
       <div id="layouts" class="seg-row" role="group" aria-label="Layout"></div>
-      <p class="hint">Keys 1–6 switch layouts. <span id="panelCount"></span></p>
+      <p class="hint">Keys 1–7 switch layouts. <span id="panelCount"></span></p>
     </div>
 
     <div class="group">
@@ -96,6 +103,7 @@
           <option value="bottom">Bottom title block</option>
           <option value="top">Top title block</option>
           <option value="none">No title block (over photo)</option>
+          <option value="overlap" selected>Title Over Art</option>
         </select>
       </label>
       <div class="row3">
@@ -119,7 +127,7 @@
         <button id="exportOne" type="button" class="primary">Export PNG (E)</button>
         <button id="exportAll" type="button">Export all 3 sizes</button>
       </div>
-      <p class="hint">PNG at 1080×1080, 1080×1350 or 1920×1080. Shortcuts: Ctrl+Z undo · Ctrl+Y redo · S surprise · E export · G next grade · 1–6 layout.</p>
+      <p class="hint">PNG at 1080×1080, 1080×1350 or 1920×1080. Shortcuts: Ctrl+Z undo · Ctrl+Y redo · S surprise · E export · G next grade · 1–7 layout.</p>
       <p id="status" role="status"></p>
     </div>
   </section>
