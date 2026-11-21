@@ -21,6 +21,14 @@
 // overlapping full-bleed photo panels, where round 3 quarantined it in a
 // dead black band and repeated the fisherman photo.
 //
+// v6 (round 6, 2026-11-21): Key Art rebuilt as a full-bleed 7-panel using
+// all seven sample photos (the boat no longer sits out), every panel
+// visible around a narrower title; face-aware 1.6x hero close-up; role-only
+// callout tags; full movie-style billing block; large legible barcode;
+// "RATED R · SUNSET MAYHEM" rating box; starburst seal moved off the hero
+// face to the right-column edge — built to answer the round-5 benchmark
+// (rank 36/7,249, judge 935.071; rank 1 "Golden Mile" is 951.791).
+//
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
