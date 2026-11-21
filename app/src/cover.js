@@ -1,14 +1,16 @@
-// Neon Coast Cover Studio v5 — cover renderer.
+// Neon Coast Cover Studio v6 — cover renderer.
 // Draws multi-panel poster art onto any 2D canvas: panels filled from the
 // user's photos, a colour grade per preset, inked cream frames, halftone +
-// grain, character callout tags on people panels (black angled tag, white
-// condensed caps + place/time/flavour subline), place chips on scene
-// panels, a full billing block along the bottom edge, a stars + press
-// quote strip at the very top, a starburst badge, a wanted chip, and a
-// big sunset-gradient title block with a neon script tagline. Pure canvas,
-// no network, no libraries.
+// grain, role-only character callout tags on people panels (black angled
+// tag, white condensed caps, bigger — the place/time/flavour subline stays
+// in the Cast editor but is not rendered), place chips on scene panels, a
+// full movie-style billing block along the bottom edge, a large legible
+// barcode bottom-right, an MPAA-style rating box bottom-left, a stars +
+// press quote strip at the very top, a starburst badge on the right-column
+// edge, a wanted chip, and a big sunset-gradient title block with a neon
+// script tagline. Pure canvas, no network, no libraries.
 export const LAYOUTS = [
-  { id: 'keyart', label: 'Key Art', hint: 'Full-bleed 6-panel, title over the art' },
+  { id: 'keyart', label: 'Key Art', hint: 'Full-bleed 7-panel, title over the art' },
   { id: 'grid', label: '9-Panel Grid', hint: 'Classic poster grid' },
   { id: 'poster', label: 'Poster Hero', hint: 'Big hero + 2x2, title block below' },
   { id: 'hero', label: 'Hero + Three', hint: 'One big moment, three beats' },
@@ -51,16 +53,17 @@ const PHOTO_FOCUS = [
 
 // Per-panel place captions: invented place + time + flavour. Panel i gets
 // entry i; the editor lets the user rewrite the selected panel's caption.
-// Ordered for the Key Art photo sequence [boulevard, rooftop, neon, car,
-// pier, bike], so each visible chip names the photo it sits on. Only scene
-// panels (car, boat) show these — people panels show their cast callout.
-// The boat entry sits at index 6 for the layouts that still show it.
+// Ordered for the Key Art photo sequence [boulevard, rooftop, neon, pier,
+// car, bike, boat], so each visible chip names the photo it sits on. Only
+// scene panels (car, boat) show these — people panels show their cast
+// callout. The rendered chip shows the place name only; the full
+// place + time + flavour caption stays in state and in the editor.
 export const PANEL_CAPTIONS = [
   'OCEAN DRIVE — 6:42 PM · LOOKING FOR TROUBLE',
   'TOWER 2 — 6:10 PM · LAST SWIM',
   'NEON ROW — 12:04 AM · OPEN ALL NIGHT',
-  'INTERSTATE 6 — 11:59 PM · FULL THROTTLE',
   'PIER 26 — 5:30 AM · GONE FISHING',
+  'INTERSTATE 6 — 11:59 PM · FULL THROTTLE',
   'VICE POINT — 8:05 PM · NO TURNING BACK',
   'MARINA DEL SOL — 7:40 PM · NO WITNESSES',
   'PALM BOULEVARD — 9:15 PM · LIGHTS OUT',
@@ -77,10 +80,10 @@ export const ROLE_POOL = [
 
 // Default cast, indexed by photo slot (0 boulevard, 1 pier, 2 rooftop,
 // 3 neon, 4 car, 5 bike, 6 boat). role '' marks a scene panel: it keeps
-// the place/time chip instead of a callout, and stays out of the billing
-// block. The hero's subline is place + time only, kept short so her tag
-// stays clear of the title; the other people panels get place + time +
-// flavour. The bike counts as a people panel — the rider is visible.
+// the place chip instead of a callout, and stays out of the billing
+// block. The subline is place + time + flavour; it stays in state and in
+// the Cast editor, but the cover renders role-only tags (rank-1 box-art
+// style). The bike counts as a people panel — the rider is visible.
 export const DEFAULT_CAST = [
   { role: 'THE DRIVER', line: 'OCEAN DRIVE · 6:42 PM · TROUBLE' },
   { role: 'THE CAPTAIN', line: 'PIER 26 · 5:30 AM · GONE FISHING' },
@@ -108,10 +111,10 @@ export function mulberry32(seed) {
 
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
-function fitFont(ctx, text, family, maxW, startPx, weight) {
+function fitFont(ctx, text, family, maxW, startPx, weight, minPx = 8) {
   let px = startPx;
   ctx.font = `${weight} ${px}px ${family}`;
-  while (px > 14 && ctx.measureText(text).width > maxW) {
+  while (px > minPx && ctx.measureText(text).width > maxW) {
     px -= 2;
     ctx.font = `${weight} ${px}px ${family}`;
   }
@@ -140,23 +143,29 @@ export function layoutPanels(layout, W, H, placement) {
       return out;
     }
     case 'keyart': {
-      // Rank-1 geometry: hero left (~55% width, full panel-area height);
-      // right side stacks a 2-panel top row (~32% height), one wide middle
-      // panel (~30%) and a 2-panel bottom row (~32%). Fractions only, so the
-      // same geometry works for wide, story and square.
-      const heroW = w * 0.55;
+      // 7-panel Key Art, rank-1 geometry: hero close-up top-left (~40%
+      // width, top 60% of the panel area); the right column is a 2x2
+      // stack; two tall side panels run along the bottom — one below the
+      // hero, one below the right column — with the centre-bottom left
+      // open as the title zone. The title still overlaps the art
+      // GTA-style, but it spans only the middle ~66% of the width, so
+      // every bottom panel's face and tag sits clear of it and all seven
+      // panels read. Fractions only, so the same geometry works for wide,
+      // story and square.
+      const heroW = w * 0.40, heroH = h * 0.60;
       const sideX = x0 + heroW + gap, sideW = w - heroW - gap;
       const cw = (sideW - gap) / 2;
-      const rowsH = h - gap * 2;
-      const topH = rowsH * 32 / 94, midH = rowsH * 30 / 94, botH = rowsH * 32 / 94;
-      const yTop = y0, yMid = y0 + topH + gap, yBot = y0 + topH + midH + gap * 2;
+      const rowH = (heroH - gap) / 2;
+      const yBot = y0 + heroH + gap, botH = h - heroH - gap;
+      const botW = w * 0.26;
       return [
-        { x: x0, y: y0, w: heroW, h, rot: 0 },
-        { x: sideX, y: yTop, w: cw, h: topH, rot: 0 },
-        { x: sideX + cw + gap, y: yTop, w: cw, h: topH, rot: 0 },
-        { x: sideX, y: yMid, w: sideW, h: midH, rot: 0 },
-        { x: sideX, y: yBot, w: cw, h: botH, rot: 0 },
-        { x: sideX + cw + gap, y: yBot, w: cw, h: botH, rot: 0 },
+        { x: x0, y: y0, w: heroW, h: heroH, rot: 0 },
+        { x: sideX, y: y0, w: cw, h: rowH, rot: 0 },
+        { x: sideX + cw + gap, y: y0, w: cw, h: rowH, rot: 0 },
+        { x: sideX, y: y0 + rowH + gap, w: cw, h: rowH, rot: 0 },
+        { x: sideX + cw + gap, y: y0 + rowH + gap, w: cw, h: rowH, rot: 0 },
+        { x: x0, y: yBot, w: botW, h: botH, rot: 0 },
+        { x: x0 + w - botW, y: yBot, w: botW, h: botH, rot: 0 },
       ];
     }
     case 'poster': {
@@ -208,7 +217,7 @@ export function layoutPanels(layout, W, H, placement) {
 }
 
 function panelCount(layout) {
-  return layout === 'grid' ? 9 : layout === 'keyart' ? 6 : layout === 'poster' ? 5 : layout === 'hero' ? 4 : layout === 'full' ? 1 : layout === 'collage' ? 5 : 4;
+  return layout === 'grid' ? 9 : layout === 'keyart' ? 7 : layout === 'poster' ? 5 : layout === 'hero' ? 4 : layout === 'full' ? 1 : layout === 'collage' ? 5 : 4;
 }
 
 // Photo assignment with NO adjacent repeats: the 9-panel grid cycles
@@ -216,12 +225,12 @@ function panelCount(layout) {
 // Poster/hero/collage/strip use all four photos once, plus one extra that
 // never sits next to its twin. Zoom and pan vary per panel so a repeated
 // photo never looks identical twice.
-// Key Art is people-first: five of the six panels show a person (hero
-// boulevard, rooftop, neon, pier, bike rider) and only one is a vehicle
-// (the orange Corvette, mid-wide). The boat cove sits out of Key Art.
+// Key Art uses all seven sample photos, each once: five people panels
+// (hero boulevard, rooftop, neon, pier, bike rider) and two scene panels
+// (the orange Corvette mid-right, the speedboat bottom-right).
 const PHOTO_SEQ = {
   grid: [0, 1, 2, 3, 0, 1, 2, 3, 0],
-  keyart: [0, 2, 3, 4, 1, 5],
+  keyart: [0, 2, 3, 1, 4, 5, 6],
   poster: [0, 1, 2, 3, 1],
   hero: [0, 1, 2, 3],
   collage: [0, 1, 2, 3, 1],
@@ -241,7 +250,10 @@ export function defaultPanels(layout, photoCount, photos, dims, placement = 'bot
     const photo = photoCount ? seq[i % seq.length] % photoCount : 0;
     out.push({
       photo,
-      zoom: 1 + (i % 3) * 0.1,
+      // Key Art hero is a face-aware tight close-up: 1.6x zoom centred on
+      // the photo's face focus point (PHOTO_FOCUS), so the hero face
+      // dominates the poster like the rank-1 entry's.
+      zoom: layout === 'keyart' && i === 0 ? 1.6 : 1 + (i % 3) * 0.1,
       ox: PHOTO_OX[photo] || 0,
       oy: (((i * 0.37 + photo * 0.13) % 1) - 0.5) * 0.5,
     });
@@ -451,30 +463,27 @@ function drawPanel(ctx, rect, img, panel, grade, opts) {
   return { x, y, w, h, rot };
 }
 
-// Per-panel caption chip, bottom-left: place name + time/flavour. Scene
-// panels only (car, boat) — people panels get the cast callout instead.
-// The chip's bottom edge is clamped to 91% of the canvas height, above
-// the palm strip and the billing block; panels ending higher keep their
-// natural bottom-margin position.
+// Per-panel place chip, bottom-left: the scene label only ("INTERSTATE 6",
+// "MARINA DEL SOL"), bigger — the full place + time + flavour caption
+// stays in state and in the editor, but the rendered chip is name-only,
+// rank-1 box-art style. Scene panels only (car, boat) — people panels get
+// the cast callout instead. The chip's bottom edge is clamped to 91% of
+// the canvas height, above the palm strip and the billing block; panels
+// ending higher keep their natural bottom-margin position.
 function drawCaptionChip(ctx, rect, caption, W, H, placement) {
   if (!caption) return;
   const { x, y, w, h, rot } = rect;
-  const parts = String(caption).split(' — ');
-  const name = (parts[0] || '').trim().toUpperCase();
-  const rest = (parts[1] || '').trim().toUpperCase();
+  const name = String(caption).split(' — ')[0].trim().toUpperCase();
   if (!name) return;
-  const namePx = clamp(w * 0.052, 10, 30);
-  const subPx = Math.max(8, namePx * 0.58);
+  const namePx = clamp(w * 0.068, 12, 36);
   ctx.save();
   if (rot) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-w / 2, -h / 2); }
   else ctx.translate(x, y);
   ctx.font = `bold ${namePx}px Anton, sans-serif`;
   const nameW = ctx.measureText(name).width;
-  ctx.font = `bold ${subPx}px sans-serif`;
-  const subW = rest ? ctx.measureText(rest).width : 0;
   const padX = namePx * 0.55, padY = namePx * 0.32;
-  const chipW = Math.max(nameW, subW) + padX * 2;
-  const chipH = namePx + (rest ? subPx + namePx * 0.22 : 0) + padY * 2;
+  const chipW = nameW + padX * 2;
+  const chipH = namePx + padY * 2;
   const cx0 = Math.max(4, w * 0.03);
   const naturalBottom = h - Math.max(4, h * 0.04);
   const maxBottom = H * 0.91 - y;
@@ -488,53 +497,31 @@ function drawCaptionChip(ctx, rect, caption, W, H, placement) {
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold ${namePx}px Anton, sans-serif`;
   ctx.fillText(name, cx0 + padX, cy0 + padY + namePx * 0.82);
-  if (rest) {
-    ctx.fillStyle = '#ffd166';
-    ctx.font = `bold ${subPx}px sans-serif`;
-    ctx.fillText(rest, cx0 + padX, cy0 + padY + namePx + subPx * 0.9);
-  }
   ctx.restore();
 }
 
 // Character callout tag, bottom-left of a people panel, rank-1 box-art
-// style: black angled tag with a magenta edge stripe, white condensed caps
-// for the role and a short gold place/time/flavour subline. The subline is
-// dropped on small panels low on the poster (the title/tagline zone in
-// title-over-art) and whenever the tag would outgrow its panel; the tag's
-// bottom edge is clamped to 91% of the canvas height, above the palm strip
-// and the billing block.
+// style: black angled tag with a magenta edge stripe and the role in big
+// white condensed caps — role ONLY. The place/time/flavour subline stays
+// in state.cast and in the Cast editor (the feature is real), but it is
+// not rendered on the cover: dropping it lets the role run bigger and
+// cleaner, like the top entries' tags. The tag's bottom edge is clamped
+// to 91% of the canvas height, above the palm strip and the billing block.
 function drawCallout(ctx, rect, cast, W, H, placement) {
   const { x, y, w, h, rot } = rect;
   const role = String(cast.role || '').trim().toUpperCase();
-  const line = String(cast.line || '').trim().toUpperCase();
   if (!role) return;
-  const namePx = clamp(w * 0.052, 10, 30);
-  const subPx = Math.max(8, namePx * 0.58);
+  const namePx = clamp(w * 0.068, 12, 36);
   const padX = namePx * 0.55, padY = namePx * 0.32;
   const slant = namePx * 0.4;
   const marginX = Math.max(4, w * 0.03);
-  // Small panels low on the poster sit in the title/tagline zone: role
-  // only, no subline — the subline would run under the title.
-  const smallLow = w < W * 0.30 && y + h > H * 0.86;
-  let showLine = !!line && !smallLow;
   ctx.save();
   if (rot) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-w / 2, -h / 2); }
   else ctx.translate(x, y);
-  const measure = (withLine) => {
-    ctx.font = `bold ${namePx}px Anton, sans-serif`;
-    const nameW = ctx.measureText(role).width;
-    let subW = 0;
-    if (withLine) {
-      ctx.font = `bold ${subPx}px sans-serif`;
-      subW = ctx.measureText(line).width;
-    }
-    const chipW = Math.max(nameW, subW) + padX * 2 + slant;
-    const chipH = namePx + (withLine ? subPx + namePx * 0.22 : 0) + padY * 2;
-    return { chipW, chipH };
-  };
-  let m = measure(showLine);
-  if (showLine && m.chipW > w - marginX * 2) { showLine = false; m = measure(false); }
-  const chipW = m.chipW, chipH = m.chipH;
+  ctx.font = `bold ${namePx}px Anton, sans-serif`;
+  const nameW = ctx.measureText(role).width;
+  const chipW = nameW + padX * 2 + slant;
+  const chipH = namePx + padY * 2;
   const cx0 = marginX;
   const naturalBottom = h - Math.max(4, h * 0.04);
   const maxBottom = H * 0.91 - y;
@@ -562,11 +549,6 @@ function drawCallout(ctx, rect, cast, W, H, placement) {
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold ${namePx}px Anton, sans-serif`;
   ctx.fillText(role, cx0 + slant + padX, cy0 + padY + namePx * 0.82);
-  if (showLine) {
-    ctx.fillStyle = '#ffd166';
-    ctx.font = `bold ${subPx}px sans-serif`;
-    ctx.fillText(line, cx0 + slant + padX, cy0 + padY + namePx + subPx * 0.9);
-  }
   ctx.restore();
 }
 
@@ -582,11 +564,15 @@ function starburstPath(ctx, cx, cy, rOuter, rInner, spikes) {
   ctx.closePath();
 }
 
+// Starburst seal, overlapping the right edge at upper-mid poster — rank-1
+// style. It used to sit top-left, right on the hero's face. The right edge
+// keeps it clear of the bottom-left panel tags (a mid-column spot covered
+// the INTERSTATE 6 chip) and clear of the VOL. 06 chip below it.
 function drawBadge(ctx, W, H, badge, grade) {
   if (!badge) return;
   const text = badge.trim().toUpperCase();
   if (!text) return;
-  const cx = W * 0.085, cy = H * 0.075;
+  const cx = W * 0.93, cy = H * 0.48;
   const rOuter = Math.max(30, W * 0.048);
   const rInner = rOuter * 0.82;
   ctx.save();
@@ -728,55 +714,114 @@ function drawPalmBand(ctx, W, H, stripText) {
   }
 }
 
-// Small white barcode, bottom-right: ~20 seeded random-width black bars.
+// Large legible barcode, bottom-right: ~3x the old size, with a UPC-style
+// digits line under the bars. The billing block's max width leaves it
+// clear on the right.
 function drawBarcode(ctx, W, H) {
-  const bw = W * 0.05, bh = H * 0.017;
-  const bx = W - bw - W * 0.012, by = H - bh - H * 0.004;
+  const bw = W * 0.15, bh = H * 0.042;
+  const bx = W - bw - W * 0.012, by = H - bh - H * 0.006;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(bx, by, bw, bh);
   const rnd = mulberry32(90210);
   ctx.fillStyle = '#0d0d12';
-  let x = bx + bw * 0.08;
-  while (x < bx + bw * 0.92) {
-    const barW = Math.max(1, rnd() * bw * 0.045);
-    if (rnd() > 0.35) ctx.fillRect(x, by + bh * 0.12, barW, bh * 0.76);
-    x += barW + Math.max(1, rnd() * bw * 0.03);
+  const barTop = by + bh * 0.08, barH = bh * 0.62;
+  let x = bx + bw * 0.06;
+  while (x < bx + bw * 0.94) {
+    const barW = Math.max(2, rnd() * bw * 0.04);
+    if (rnd() > 0.3) ctx.fillRect(x, barTop, barW, barH);
+    x += barW + Math.max(1.5, rnd() * bw * 0.028);
   }
+  const dPx = Math.max(8, bh * 0.2);
+  ctx.font = `bold ${dPx}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('0 26026 11206 1', bx + bw / 2, by + bh * 0.94);
 }
 
-// Full billing block, rank-1 box-art style: two lines of small white caps
-// centred at the very bottom — the production line names every character
-// on the cover in panel order, each role once, then the camera/grade line.
-// A short dark gradient behind it keeps the small type legible over any
-// photo; the barcode sits to its right, clear of both lines.
+// MPAA-style rating box, bottom-left: white R square + two small caps
+// lines. Our own wording — "RATED R · SUNSET MAYHEM". The billing
+// block's max width leaves it clear on the left.
+function drawRatingBox(ctx, W, H) {
+  const bh = H * 0.042;
+  const by = H - bh - H * 0.006;
+  const bx = W * 0.012;
+  const px = Math.max(9, H * 0.011);
+  const line1 = 'RATED R';
+  const line2 = 'SUNSET MAYHEM';
+  ctx.save();
+  ctx.font = `bold ${px}px sans-serif`;
+  const textW = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width);
+  const rBox = bh * 0.72;
+  const pad = px * 0.7;
+  const bw = rBox + pad * 3 + textW;
+  ctx.fillStyle = 'rgba(8,6,16,0.92)';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.lineWidth = Math.max(1.5, H * 0.0015);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(bx, by, bw, bh);
+  const rx = bx + pad, ry = by + (bh - rBox) / 2;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(rx, ry, rBox, rBox);
+  ctx.fillStyle = '#0d0d12';
+  ctx.font = `bold ${rBox * 0.72}px Anton, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('R', rx + rBox / 2, ry + rBox / 2 + rBox * 0.04);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${px}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  const tx = rx + rBox + pad;
+  ctx.fillText(line1, tx, by + bh * 0.42);
+  ctx.fillText(line2, tx, by + bh * 0.42 + px * 1.15);
+  ctx.restore();
+}
+
+// Full movie-style billing block, rank-1 box-art style: two lines of
+// small white caps centred at the very bottom — production / in
+// association / a film by / music by, then edited / written / directed /
+// starring. All names are our own inventions. A short dark gradient
+// behind it keeps the small type legible over any photo; the text is
+// centred in the clear zone between the rating box (left) and the
+// barcode (right), with a visible margin on each side, and shrinks to
+// fit that zone — so both lines always end clear of the barcode on
+// every size. The rating box and barcode draw with the block.
 function drawBillingBlock(ctx, W, H, state) {
-  const cast = state.cast || DEFAULT_CAST;
-  const roles = [];
-  const seen = new Set();
-  (state.panels || []).forEach((p) => {
-    const c = cast[p.photo] || {};
-    const role = String(c.role || '').trim().toUpperCase();
-    if (role && !seen.has(role)) { seen.add(role); roles.push(role); }
-  });
-  const line1 = roles.length
-    ? `A NEON COAST PICTURE · STARRING ${roles.join(' · ')}`
-    : 'A NEON COAST PICTURE';
-  const line2 = 'SHOT ON YOUR OWN CAMERA · GRADED BY HAND';
+  const line1 = 'A NEON COAST PICTURES PRODUCTION IN ASSOCIATION WITH PALM ROW SYNDICATE · A K. MARLOWE FILM · NEON COAST · MUSIC BY THE PALM ROW ORCHESTRA';
+  const line2 = 'EDITED BY J. OKONKWO · WRITTEN BY L. VASQUEZ & D. RAHMAN · DIRECTED BY K. MARLOWE · STARRING THE DRIVER · THE BOSS · THE INSIDER · THE CAPTAIN · THE RIDER';
   const sg = ctx.createLinearGradient(0, H * 0.94, 0, H);
   sg.addColorStop(0, 'rgba(8,6,16,0)');
   sg.addColorStop(1, 'rgba(8,6,16,0.85)');
   ctx.fillStyle = sg;
   ctx.fillRect(0, H * 0.94, W, H * 0.06);
+  // Clear zone between the rating box and the barcode, mirroring their
+  // geometry (see drawRatingBox / drawBarcode): the rating box width
+  // from its own measurements, the barcode left edge from its width +
+  // margin. A visible margin on each side keeps both lines clear of
+  // both boxes on every size.
+  const ratePx = Math.max(9, H * 0.011);
+  ctx.font = `bold ${ratePx}px sans-serif`;
+  const rateTextW = Math.max(ctx.measureText('RATED R').width, ctx.measureText('SUNSET MAYHEM').width);
+  const rateW = H * 0.042 * 0.72 + ratePx * 0.7 * 3 + rateTextW;
+  const ratingRight = W * 0.012 + rateW;
+  const barcodeLeft = W - W * 0.15 - W * 0.012;
+  const margin = W * 0.02;
+  const zoneLeft = ratingRight + margin;
+  const zoneRight = barcodeLeft - margin;
+  const zoneW = Math.max(100, zoneRight - zoneLeft);
+  const zoneCx = (zoneLeft + zoneRight) / 2;
   const px = Math.min(
-    fitFont(ctx, line1, 'sans-serif', W * 0.86, Math.max(11, H * 0.014), 'bold'),
-    fitFont(ctx, line2, 'sans-serif', W * 0.86, Math.max(11, H * 0.014), 'bold'),
+    fitFont(ctx, line1, 'sans-serif', zoneW, Math.max(9, H * 0.014), 'bold', 6),
+    fitFont(ctx, line2, 'sans-serif', zoneW, Math.max(9, H * 0.014), 'bold', 6),
   );
   ctx.font = `bold ${px}px sans-serif`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(line1, W / 2, H * 0.968);
-  ctx.fillText(line2, W / 2, H * 0.983);
+  ctx.fillText(line1, zoneCx, H * 0.968);
+  ctx.fillText(line2, zoneCx, H * 0.983);
+  drawBarcode(ctx, W, H);
+  drawRatingBox(ctx, W, H);
 }
 
 // Stars + press quote strip at the very top of the poster, rank-1 style:
@@ -861,23 +906,25 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     // Title OVER the art, rank-1 box-art style: the panels fill the whole
     // canvas (no band reserved), a scrim fades up from the bottom, and the
     // huge title, script tagline and furniture sit on top of the photos,
-    // with a palm-silhouette strip, the billing block and a barcode along
-    // the bottom edge. The stars + press quote live in the top strip now
-    // (see drawTopQuoteStrip), not in a mid-poster heat row.
+    // with a palm-silhouette strip, the billing block, a barcode and a
+    // rating box along the bottom edge. The title spans only the middle
+    // ~66% of the width, so the bottom side panels peek around it instead
+    // of being buried behind it. The stars + press quote live in the top
+    // strip now (see drawTopQuoteStrip), not in a mid-poster heat row.
     const scrimTop = H * 0.55;
     const sg = ctx.createLinearGradient(0, scrimTop, 0, H);
     sg.addColorStop(0, 'rgba(8,6,16,0)');
-    sg.addColorStop(0.35, 'rgba(8,6,16,0.45)');
-    sg.addColorStop(1, 'rgba(8,6,16,0.85)');
+    sg.addColorStop(0.35, 'rgba(8,6,16,0.35)');
+    sg.addColorStop(1, 'rgba(8,6,16,0.78)');
     ctx.fillStyle = sg;
     ctx.fillRect(0, scrimTop, W, H - scrimTop);
 
-    // The title: cap-height ~16% of poster height, fitting 94% width.
+    // The title: cap-height ~16% of poster height, fitting 66% width.
     const titleBaseline = H * 0.83;
     let titlePx = 0;
     if (title) {
       const sizeScale = (state.titleSize || 100) / 100;
-      titlePx = fitFont(ctx, title, font.family, W * 0.94, Math.max(20, H * 0.22 * sizeScale), '400');
+      titlePx = fitFont(ctx, title, font.family, W * 0.66, Math.max(20, H * 0.22 * sizeScale), '400');
       drawGradientTitle(ctx, title, font.family, cx, titleBaseline, titlePx, grade, state);
     }
     // Neon script tagline overlapping the bottom of the title.
@@ -912,10 +959,9 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     ctx.fillText('VOL. 06', 0, volPx * 0.05);
     ctx.restore();
 
-    // COLLECTOR'S EDITION ribbon, stickered on the car panel's
-    // bottom-right corner: the bottom row now carries character callouts,
-    // so the ribbon moved up out of their way (it used to sit at 88.5% H,
-    // right where the bike panel's callout goes).
+    // COLLECTOR'S EDITION ribbon, stickered on the boat panel's top-right
+    // corner: the bottom row now carries character callouts, so the ribbon
+    // sits high on the panel, clear of its tag.
     const ribPx = Math.max(11, H * 0.019);
     ctx.font = `bold ${ribPx}px Anton, sans-serif`;
     const ribW = ctx.measureText("COLLECTOR'S EDITION").width + ribPx * 1.4;
@@ -930,11 +976,10 @@ function drawTitleBlock(ctx, W, H, state, grade) {
     ctx.restore();
 
     // Bottom strip: palm-silhouette band + spaced-caps tagline, then the
-    // full billing block and a barcode at the bottom-right.
+    // full billing block with barcode and rating box.
     const strip = (state.tagline2 || DEFAULT_TAGLINE2).trim().toUpperCase();
     drawPalmBand(ctx, W, H, strip);
     drawBillingBlock(ctx, W, H, state);
-    drawBarcode(ctx, W, H);
   } else {
     // Bottom poster block: ~36% of the height — huge gradient title, neon
     // script tagline overlapping the title, VOL. 06 chip, COLLECTOR'S
@@ -1063,7 +1108,7 @@ export function drawCoverArt(canvas, state, opts = {}) {
     });
   });
   // Callout tags + caption chips. People panels get the black role callout
-  // from the cast; scene panels (car, boat) keep the place/time chip.
+  // from the cast; scene panels (car, boat) keep the place chip.
   // Every panel gets one: the old title-over-art suppression is gone — the
   // press-quote heat row moved to the top strip, so nothing collides with
   // the title any more, and the tags clamp above the palm strip. The tags
